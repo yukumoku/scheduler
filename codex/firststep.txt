@@ -1,0 +1,365 @@
+あなたは熟練したLaravel + React + TypeScriptエンジニアです。
+
+これから「ScheduleCraft」というイベント向けスケジュール・シフト自動作成Webアプリを実装します。
+
+まずはMVPの基盤を作成してください。
+
+## 技術構成
+
+* Laravel 13.x
+* PHP 8.3以上
+* PostgreSQL
+* Laravel Sanctum
+* Laravel Socialite
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* shadcn/ui
+* TanStack Query
+* React Hook Form
+* Zod
+
+## アプリ概要
+
+ScheduleCraftは、文化祭・体育祭・部活動・サークル・ボランティア・地域イベントなどで使える、汎用的なスケジュール・シフト自動作成サービスです。
+
+管理者がグループとイベントを作成し、メンバーを招待します。
+メンバーは参加可能日時を入力します。
+管理者は希望提出状況をもとに、公平性や希望反映率を考慮してシフトを自動生成します。
+完成したシフトは公開・Excel出力できます。
+
+## 今回実装する範囲
+
+最初の実装では、以下の基盤だけを作ってください。
+
+### Backend
+
+1. Laravelプロジェクトの基本構成を確認・整備する
+2. Sanctumを導入する
+3. Socialiteを導入する
+4. Google / Microsoft OAuth用の設定項目を `.env.example` に追加する
+5. PostgreSQL前提のDB設定にする
+6. APIレスポンス形式を統一する仕組みを作る
+7. 以下のEnumを作る
+
+   * GroupRole
+   * EventStatus
+   * ShiftStatus
+   * AvailabilityStatus
+8. 以下のModelとMigrationを作る
+
+   * User
+   * Group
+   * GroupMember
+   * Event
+   * EventSlot
+   * Availability
+   * ShiftRule
+   * ShiftGenerationSetting
+   * Shift
+   * ShiftAssignment
+   * Invitation
+9. リレーションを定義する
+10. 基本的なPolicyの雛形を作る
+
+    * GroupPolicy
+    * EventPolicy
+    * ShiftPolicy
+
+### Frontend
+
+1. React + TypeScript + Vite構成を整える
+2. Tailwind CSSを設定する
+3. 画面レイアウトの土台を作る
+4. 以下のページを空実装で作る
+
+   * Login
+   * Dashboard
+   * Groups
+   * GroupDetail
+   * Events
+   * EventDetail
+   * Availability
+   * ShiftCreate
+   * ShiftDetail
+5. 共通レイアウトを作る
+
+   * PC: サイドバー
+   * スマホ: 下部ナビゲーション
+6. APIクライアントの雛形を作る
+7. TanStack QueryのProviderを設定する
+
+## ディレクトリ方針
+
+Laravel側：
+
+```text
+app/
+  Actions/
+  Enums/
+  Http/
+    Controllers/
+      Api/
+    Requests/
+    Resources/
+  Models/
+  Policies/
+  Services/
+    ShiftGeneration/
+routes/
+  api.php
+database/
+  migrations/
+```
+
+React側：
+
+```text
+resources/js/
+  components/
+  layouts/
+  features/
+    auth/
+    groups/
+    events/
+    availability/
+    shifts/
+  pages/
+  lib/
+  types/
+```
+
+## DB設計の前提
+
+主キーはUUIDにしてください。
+
+全テーブルに基本的に以下を入れてください。
+
+```text
+id
+created_at
+updated_at
+```
+
+必要な外部キー制約を設定してください。
+
+## テーブル概要
+
+### users
+
+SupabaseではなくLaravel標準のusersをベースにしてください。
+
+追加カラム：
+
+```text
+display_name
+avatar_url
+provider
+provider_id
+```
+
+### groups
+
+```text
+name
+description
+icon_url
+owner_id
+invite_code
+is_invite_enabled
+```
+
+### group_members
+
+```text
+group_id
+user_id
+role
+joined_at
+```
+
+role:
+
+```text
+owner
+admin
+member
+```
+
+### events
+
+```text
+group_id
+name
+description
+location
+start_date
+end_date
+availability_deadline
+status
+created_by
+```
+
+status:
+
+```text
+draft
+collecting
+generated
+published
+closed
+```
+
+### event_slots
+
+```text
+event_id
+date
+start_time
+end_time
+required_people
+location
+note
+```
+
+### availability
+
+```text
+event_id
+user_id
+date
+start_time
+end_time
+status
+comment
+```
+
+status:
+
+```text
+available
+unavailable
+preferred
+```
+
+### shift_rules
+
+```text
+event_id
+slot_minutes
+min_work_minutes
+max_work_minutes
+max_continuous_minutes
+break_minutes
+leader_required_per_slot
+```
+
+### shift_generation_settings
+
+```text
+event_id
+preference_weight
+fairness_weight
+balance_workload_weight
+avoid_continuous_work_weight
+leader_assignment_weight
+required_people_weight
+```
+
+各weightは0〜100。
+
+### shifts
+
+```text
+event_id
+version
+status
+generated_by
+preference_score
+fairness_score
+required_people_score
+average_work_minutes
+max_work_minutes
+min_work_minutes
+```
+
+status:
+
+```text
+draft
+published
+archived
+```
+
+### shift_assignments
+
+```text
+shift_id
+slot_id
+user_id
+is_fixed
+assigned_by
+```
+
+assigned_by:
+
+```text
+auto
+manual
+```
+
+### invitations
+
+```text
+group_id
+invite_code
+created_by
+expires_at
+is_active
+```
+
+## 実装ルール
+
+* TypeScriptではanyをなるべく使わない
+* Laravel Controllerにビジネスロジックを書きすぎない
+* 将来的にService / Actionへ分離しやすい構成にする
+* APIレスポンスは以下の形に統一する
+
+```json
+{
+  "success": true,
+  "data": {},
+  "error": null
+}
+```
+
+エラー時：
+
+```json
+{
+  "success": false,
+  "data": null,
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "message"
+  }
+}
+```
+
+* UI文言は日本語
+* コード内コメントは英語
+* DBカラムはsnake_case
+* APIレスポンスはcamelCase
+* まずは動くMVPの土台を優先する
+* 完全なシフト生成アルゴリズムはまだ実装しなくてよい
+* Excel出力もまだ実装しなくてよい
+* ただし後から追加しやすい構成にする
+
+## 最終的に出してほしいもの
+
+1. 変更したファイル一覧
+2. 作成したModel / Migration / Enum一覧
+3. 実行すべきコマンド
+4. 次に実装すべきタスク一覧
+5. 注意点や未実装部分
