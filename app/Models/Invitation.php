@@ -9,7 +9,7 @@ class Invitation extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['group_id', 'invited_email', 'invited_by', 'token', 'expires_at', 'accepted_at'];
+    protected $fillable = ['group_id', 'invited_email', 'invited_by', 'token', 'code', 'expires_at', 'accepted_at'];
     protected $casts = ['expires_at' => 'datetime', 'accepted_at' => 'datetime'];
     public function group(): BelongsTo { return $this->belongsTo(Group::class); }
     public function inviter(): BelongsTo { return $this->belongsTo(User::class, 'invited_by'); }

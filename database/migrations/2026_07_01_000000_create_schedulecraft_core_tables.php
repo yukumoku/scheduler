@@ -24,7 +24,7 @@ return new class extends Migration {
             $table->uuid('id')->primary();
             $table->foreignUuid('group_id')->constrained('groups')->cascadeOnDelete();
             $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('role', ['owner', 'admin', 'member'])->default('member');
+            $table->enum('role', ['owner', 'member'])->default('member');
             $table->timestampTz('joined_at')->nullable();
             $table->timestampsTz();
             $table->unique(['group_id', 'user_id']);

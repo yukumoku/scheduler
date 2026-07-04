@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuids, Notifiable;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable;
 
     protected $fillable = [
         'display_name',
@@ -20,6 +21,7 @@ class User extends Authenticatable
         'avatar_url',
         'provider',
         'provider_id',
+        'tutorial_completed_at',
     ];
 
     protected $hidden = [
@@ -30,12 +32,18 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'tutorial_completed_at' => 'datetime',
         ];
     }
 
     public function memberships(): HasMany
     {
         return $this->hasMany(GroupMember::class);
+    }
+
+    public function teamMemberships(): HasMany
+    {
+        return $this->hasMany(TeamMember::class);
     }
 
     public function ownedGroups(): HasMany

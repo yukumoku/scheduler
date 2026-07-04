@@ -22,6 +22,7 @@ class InvitationFactory extends Factory
             'invited_email' => fake()->safeEmail(),
             'invited_by' => User::factory(),
             'token' => Str::random(40),
+            'code' => Str::upper(Str::random(8)),
             'expires_at' => now()->addDays(7),
             'accepted_at' => null,
         ];

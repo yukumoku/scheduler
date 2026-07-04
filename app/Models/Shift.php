@@ -11,12 +11,13 @@ class Shift extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['event_id', 'status', 'generated_at', 'published_at'];
+    protected $fillable = ['event_id', 'event_slot_id', 'status', 'generated_at', 'published_at'];
     protected $casts = [
         'generated_at' => 'datetime',
         'published_at' => 'datetime',
         'status' => ShiftStatus::class,
     ];
     public function event(): BelongsTo { return $this->belongsTo(Event::class); }
+    public function eventSlot(): BelongsTo { return $this->belongsTo(EventSlot::class); }
     public function assignments(): HasMany { return $this->hasMany(ShiftAssignment::class); }
 }

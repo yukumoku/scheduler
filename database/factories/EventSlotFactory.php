@@ -15,12 +15,20 @@ class EventSlotFactory extends Factory
 
     public function definition(): array
     {
+        $date = now()->addDays(7);
+        $startTime = '09:00:00';
+        $endTime = '12:00:00';
+
         return [
             'event_id' => Event::factory(),
-            'date' => now()->addDays(7)->toDateString(),
-            'start_time' => '09:00:00',
-            'end_time' => '12:00:00',
+            'task_id' => null,
+            'date' => $date->toDateString(),
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'start_datetime' => $date->copy()->setTimeFromTimeString($startTime),
+            'end_datetime' => $date->copy()->setTimeFromTimeString($endTime),
             'required_people' => 1,
+            'status' => 'open',
             'location' => fake()->city(),
             'note' => fake()->sentence(),
         ];

@@ -7,14 +7,140 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
-    --color-brand-50: #eefbf5;
-    --color-brand-100: #d8f3e4;
-    --color-brand-500: #19a974;
-    --color-brand-600: #11805a;
-    --color-brand-700: #0e684a;
+    --color-background: #f8fafc;
+    --color-card: #ffffff;
+    --color-text: #0f172a;
+    --color-muted-text: #64748b;
+    --color-border: #e2e8f0;
+
+    --color-primary: #7c3aed;
+    --color-primary-light: #ede9fe;
+    --color-primary-dark: #5b21b6;
+
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-danger: #ef4444;
+    --color-info: #3b82f6;
+
+    --color-lavender: #ede9fe;
+    --color-sky: #dbeafe;
+    --color-mint: #d1fae5;
+    --color-peach: #ffedd5;
+    --color-rose: #ffe4e6;
 }
 
 body {
-    background: #f8fafc;
+    background:
+        radial-gradient(circle at top left, rgba(237, 233, 254, 0.5), transparent 24%),
+        radial-gradient(circle at top right, rgba(219, 234, 254, 0.45), transparent 20%),
+        linear-gradient(180deg, #f8fafc 0%, #f8fafc 100%);
     color: #0f172a;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+html,
+body,
+#root {
+    min-height: 100%;
+}
+
+@keyframes alloca-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes alloca-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes alloca-float {
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes alloca-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.alloca-fade-up {
+    animation: alloca-fade-up 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.alloca-scale-in {
+    animation: alloca-scale-in 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.alloca-float {
+    animation: alloca-float 7s ease-in-out infinite;
+}
+
+.alloca-shimmer {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+    background-size: 200% 100%;
+    animation: alloca-shimmer 2.2s linear infinite;
+}
+
+.alloca-stagger > * {
+    animation: alloca-fade-up 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.alloca-stagger > *:nth-child(2) {
+    animation-delay: 70ms;
+}
+
+.alloca-stagger > *:nth-child(3) {
+    animation-delay: 140ms;
+}
+
+.alloca-stagger > *:nth-child(4) {
+    animation-delay: 210ms;
+}
+
+.alloca-stagger > *:nth-child(5) {
+    animation-delay: 280ms;
+}
+
+.scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .alloca-fade-up,
+    .alloca-scale-in,
+    .alloca-float,
+    .alloca-shimmer,
+    .alloca-stagger > * {
+        animation: none !important;
+    }
 }

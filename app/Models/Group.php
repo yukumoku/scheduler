@@ -26,6 +26,16 @@ class Group extends Model
         return $this->hasMany(GroupMember::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class);
+    }
+
+    public function commonAvailabilitySets(): HasMany
+    {
+        return $this->hasMany(CommonAvailabilitySet::class);
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(Event::class);

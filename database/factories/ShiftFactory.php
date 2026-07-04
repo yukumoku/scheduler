@@ -18,6 +18,7 @@ class ShiftFactory extends Factory
     {
         return [
             'event_id' => Event::factory(),
+            'event_slot_id' => null,
             'status' => ShiftStatus::Draft,
             'generated_at' => null,
             'published_at' => null,
