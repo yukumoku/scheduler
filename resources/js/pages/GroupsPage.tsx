@@ -215,7 +215,9 @@ export function GroupsPage() {
           </label>
 
           {joinMutation.error instanceof Error ? (
-            <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">参加できませんでした。コードや期限を確認してください。</p>
+            <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {joinMutation.error.message || '参加できませんでした。コードや期限を確認してください。'}
+            </p>
           ) : null}
 
           <div className="flex items-center justify-end gap-3 pt-2">

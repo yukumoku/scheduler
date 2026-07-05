@@ -85,12 +85,15 @@ export function CommonAvailabilitySetPage() {
   useEffect(() => {
     const nextDrafts: Record<string, AvailabilityDraft> = {}
     for (const slot of meQuery.data?.slots ?? []) {
-      const status = slot.availabilityStatus === 'available' || slot.availabilityStatus === 'preferred' ? slot.availabilityStatus : 'unavailable'
+      if (slot.availabilityStatus !== 'available' && slot.availabilityStatus !== 'preferred') {
+        continue
+      }
+
       nextDrafts[`${slot.date}|${slot.startTime}|${slot.endTime}`] = {
         date: slot.date,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        status,
+        status: slot.availabilityStatus,
         comment: slot.availabilityComment ?? '',
       }
     }
@@ -237,9 +240,15 @@ export function CommonAvailabilitySetPage() {
 
   return (
     <div className="space-y-4 pb-44 md:pb-32">
+      {activeTab === 'input' && savedDrafts.length === 0 ? (
+        <div className="sticky top-3 z-20 rounded-2xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm backdrop-blur">
+          参加できる日を入力してください。入力していない日は「参加できない」として扱われます。
+        </div>
+      ) : null}
+
       <PageHeader
         title={setData?.name ?? '参加可能日時'}
-        description={setData?.description ?? '行ける時間だけ入力します。'}
+        description={setData?.description ?? '日付を選んで、行ける時間だけ入力します。'}
         action={
           <Button variant="secondary" onClick={() => navigate(-1)}>
             戻る
@@ -292,7 +301,7 @@ export function CommonAvailabilitySetPage() {
             onClick={() => setActiveTab('input')}
             className={[
               'rounded-xl px-4 py-3 text-sm font-medium transition',
-              activeTab === 'input' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+              activeTab === 'input' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
             ].join(' ')}
           >
             入力
@@ -302,7 +311,7 @@ export function CommonAvailabilitySetPage() {
             onClick={() => setActiveTab('submissions')}
             className={[
               'rounded-xl px-4 py-3 text-sm font-medium transition',
-              activeTab === 'submissions' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
+              activeTab === 'submissions' ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50',
             ].join(' ')}
           >
             提出状況
@@ -312,10 +321,11 @@ export function CommonAvailabilitySetPage() {
 
       {activeTab === 'input' ? (
         <div className="space-y-4">
-          <Card className="space-y-4 border-slate-200 bg-slate-50/70">
+          <Card className="space-y-4 border-slate-200 bg-white">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">カレンダー</h2>
+                <h2 className="text-lg font-semibold text-slate-900">日付を選ぶ</h2>
+                <p className="text-sm text-slate-500">参加できる日だけ押して、時間を追加します。</p>
               </div>
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Badge variant="brand">{periodDates.length}日</Badge>
@@ -365,9 +375,9 @@ export function CommonAvailabilitySetPage() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-7 gap-1.5 rounded-3xl bg-slate-50 p-2 sm:gap-2">
                   {Array.from({ length: activeMonthCursor ? new Date(`${activeMonthCursor}-01T00:00:00`).getDay() : 0 }).map((_, index) => (
-                    <div key={`blank-${index}`} className="h-12 rounded-xl sm:h-20 sm:rounded-2xl" />
+                    <div key={`blank-${index}`} className="aspect-square rounded-xl sm:rounded-2xl" />
                   ))}
                   {activeMonthDates.map((date) => {
                       const weekdayLabel = new Intl.DateTimeFormat('ja-JP', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))
@@ -379,21 +389,23 @@ export function CommonAvailabilitySetPage() {
                           type="button"
                           onClick={() => openDateModal(date)}
                           className={[
-                            'flex h-12 flex-col justify-between rounded-xl border p-1.5 text-left transition sm:h-20 sm:rounded-2xl sm:p-2',
+                            'flex aspect-square flex-col justify-between rounded-xl border p-1.5 text-left transition sm:rounded-2xl sm:p-2',
                             hasEntries
-                              ? 'border-violet-300 bg-violet-50 text-violet-700 shadow-sm'
-                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                              ? 'border-slate-950 bg-slate-950 text-white shadow-sm'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
                           ].join(' ')}
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold">{date.slice(8, 10)}</span>
-                            <span className="hidden text-[11px] text-slate-400 sm:inline">{weekdayLabel}</span>
+                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-white/70' : 'text-slate-400'].join(' ')}>{weekdayLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="hidden text-[11px] text-slate-400 sm:inline">期間内</span>
-                            <Badge variant={hasEntries ? 'brand' : 'neutral'} className="px-2 py-0.5 text-[10px]">
-                              {hasEntries ? `${dayEntries.length}件` : '＋'}
-                            </Badge>
+                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-white/70' : 'text-slate-400'].join(' ')}>
+                              {hasEntries ? '入力済み' : '未入力'}
+                            </span>
+                            <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', hasEntries ? 'bg-white text-slate-950' : 'bg-slate-100 text-slate-500'].join(' ')}>
+                              {hasEntries ? `${dayEntries.length}` : '＋'}
+                            </span>
                           </div>
                         </button>
                       )
@@ -446,7 +458,7 @@ export function CommonAvailabilitySetPage() {
         <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
           <Card className="space-y-4">
             <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-violet-600" />
+              <Users className="h-5 w-5 text-slate-700" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">提出状況</h2>
                 <p className="text-sm text-slate-500">オーナー向けの確認画面です。</p>
@@ -491,7 +503,7 @@ export function CommonAvailabilitySetPage() {
 
           <Card className="space-y-4">
             <div className="flex items-center gap-2">
-              <CalendarCheck2 className="h-5 w-5 text-violet-600" />
+              <CalendarCheck2 className="h-5 w-5 text-slate-700" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">時間帯ごとの集計</h2>
                 <p className="text-sm text-slate-500">参加可能人数を確認できます。</p>

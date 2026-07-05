@@ -134,7 +134,7 @@ class InvitationController extends Controller
 
     private function acceptInvitation(Request $request, Invitation $invitation): JsonResponse
     {
-        abort_if($invitation->accepted_at, 422, 'この招待はすでに使用されています。');
+        abort_if($invitation->invited_email && $invitation->accepted_at, 422, 'この招待はすでに使用されています。');
         abort_if($invitation->expires_at && $invitation->expires_at->isPast(), 422, 'この招待は期限切れです。');
 
         if ($invitation->invited_email && $request->user()->email !== $invitation->invited_email) {
@@ -151,9 +151,11 @@ class InvitationController extends Controller
 
         $this->ensureDefaultTeam($invitation->group, $request->user()->id);
 
-        $invitation->update([
-            'accepted_at' => now(),
-        ]);
+        if ($invitation->invited_email) {
+            $invitation->update([
+                'accepted_at' => now(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,
