@@ -218,21 +218,34 @@ export function CalendarPage() {
 
   const toggleSelectedGroup = (groupId: string) => {
     const childEventIds = eventIdsByGroup.get(groupId) ?? []
+    const hasSelectedChild = childEventIds.some((eventId) => selectedEventIds.includes(eventId))
 
     setSelectedGroupIds((current) =>
-      current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId],
+      hasSelectedChild || current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId],
     )
     setSelectedEventIds((current) =>
-      current.some((eventId) => childEventIds.includes(eventId))
+      hasSelectedChild
         ? current.filter((eventId) => !childEventIds.includes(eventId))
         : Array.from(new Set([...current, ...childEventIds])),
     )
   }
 
   const toggleSelectedEvent = (eventId: string) => {
-    setSelectedEventIds((current) =>
-      current.includes(eventId) ? current.filter((id) => id !== eventId) : [...current, eventId],
-    )
+    const group = eventsByGroup.find((entry) => entry.events.some((event) => event.id === eventId))
+
+    setSelectedEventIds((current) => {
+      const next = current.includes(eventId) ? current.filter((id) => id !== eventId) : [...current, eventId]
+
+      if (group) {
+        const groupEventIds = eventIdsByGroup.get(group.groupId) ?? []
+        const hasSelectedChild = groupEventIds.some((id) => next.includes(id))
+        setSelectedGroupIds((groups) =>
+          hasSelectedChild ? Array.from(new Set([...groups, group.groupId])) : groups.filter((id) => id !== group.groupId),
+        )
+      }
+
+      return next
+    })
   }
 
   const toggleExpandedGroup = (groupId: string) => {
@@ -374,26 +387,13 @@ export function CalendarPage() {
                 <div className="flex items-center justify-between gap-3">
                   <p className="inline-flex items-center gap-2 text-xs font-semibold text-slate-900">
                     <FolderKanban className="h-4 w-4 text-slate-700" />
-                    グループ
-                  </p>
-                  <Badge variant="neutral" className="px-2 py-0.5 text-[10px]">
-                    {selectedGroupIds.length}
-                  </Badge>
-                </div>
-                {renderGroupTree(true)}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="inline-flex items-center gap-2 text-xs font-semibold text-slate-900">
-                    <CalendarDays className="h-4 w-4 text-slate-700" />
-                    イベント
+                    グループ / イベント
                   </p>
                   <Badge variant="neutral" className="px-2 py-0.5 text-[10px]">
                     {selectedEventIds.length}
                   </Badge>
                 </div>
-                <p className="text-[11px] text-slate-500">イベントは各グループの下で選びます。</p>
+                {renderGroupTree(true)}
               </div>
             </div>
           </Card>
@@ -415,22 +415,11 @@ export function CalendarPage() {
               <div className="flex items-center justify-between gap-3">
                   <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <FolderKanban className="h-4 w-4 text-slate-700" />
-                  グループ
-                </p>
-                <Badge variant="neutral">{selectedGroupIds.length}</Badge>
-              </div>
-              {renderGroupTree(false)}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <CalendarDays className="h-4 w-4 text-slate-700" />
-                  イベント
+                  グループ / イベント
                 </p>
                 <Badge variant="neutral">{selectedEventIds.length}</Badge>
               </div>
-              <p className="text-sm text-slate-500">イベントは各グループの下で選びます。</p>
+              {renderGroupTree(false)}
             </div>
           </div>
         </Card>

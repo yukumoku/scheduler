@@ -77,7 +77,19 @@ class InvitationController extends Controller
 
     public function showByCode(string $code): JsonResponse
     {
-        $invitation = $this->findByCode($code)->load(['group', 'inviter']);
+        $invitation = $this->findInvitationByCode($code);
+
+        if (! $invitation) {
+            $group = $this->findGroupByInviteCode($code);
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->serializeGroupCodeInvitation($group),
+                'error' => null,
+            ]);
+        }
+
+        $invitation->load(['group', 'inviter']);
 
         return response()->json([
             'success' => true,
@@ -98,7 +110,13 @@ class InvitationController extends Controller
 
     public function acceptByCode(Request $request, string $code): JsonResponse
     {
-        return $this->acceptInvitation($request, $this->findByCode($code)->load('group'));
+        $invitation = $this->findInvitationByCode($code);
+
+        if ($invitation) {
+            return $this->acceptInvitation($request, $invitation->load('group'));
+        }
+
+        return $this->acceptGroupCode($request, $this->findGroupByInviteCode($code));
     }
 
     public function destroy(Request $request, Invitation $invitation): JsonResponse
@@ -147,11 +165,46 @@ class InvitationController extends Controller
         ]);
     }
 
-    private function findByCode(string $code): Invitation
+    private function findInvitationByCode(string $code): ?Invitation
     {
         return Invitation::query()
-            ->where('code', Str::upper(trim($code)))
+            ->where('code', $this->normalizeCode($code))
+            ->first();
+    }
+
+    private function findGroupByInviteCode(string $code): Group
+    {
+        return Group::query()
+            ->where('invite_code', $this->normalizeCode($code))
+            ->where('is_invite_enabled', true)
             ->firstOrFail();
+    }
+
+    private function normalizeCode(string $code): string
+    {
+        return Str::upper(trim($code));
+    }
+
+    private function acceptGroupCode(Request $request, Group $group): JsonResponse
+    {
+        $group->members()->updateOrCreate(
+            ['user_id' => $request->user()->id],
+            [
+                'role' => GroupRole::Member,
+                'joined_at' => now(),
+            ],
+        );
+
+        $this->ensureDefaultTeam($group, $request->user()->id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'accepted' => true,
+                'groupId' => $group->id,
+            ],
+            'error' => null,
+        ]);
     }
 
     private function generateInvitationCode(): string
@@ -222,6 +275,26 @@ class InvitationController extends Controller
                 'avatarUrl' => AvatarUrl::public($invitation->inviter->avatar_url),
                 'provider' => $invitation->inviter->provider,
             ] : null,
+        ];
+    }
+
+    private function serializeGroupCodeInvitation(Group $group): array
+    {
+        return [
+            'id' => 'group-'.$group->id,
+            'groupId' => $group->id,
+            'group' => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'description' => $group->description,
+            ],
+            'email' => null,
+            'token' => '',
+            'code' => $group->invite_code,
+            'inviteUrl' => url('/groups'),
+            'expiresAt' => null,
+            'acceptedAt' => null,
+            'inviter' => null,
         ];
     }
 }

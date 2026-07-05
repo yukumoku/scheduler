@@ -22,7 +22,7 @@ const groupSchema = z.object({
   description: z.string().max(1000).optional().transform((value) => value?.trim() || ''),
 })
 const joinSchema = z.object({
-  code: z.string().min(1, '招待コードを入力してください').max(16).transform((value) => value.trim().toUpperCase()),
+  code: z.string().min(1, '招待コードを入力してください').max(32).transform((value) => value.trim().toUpperCase()),
 })
 
 type GroupFormValues = z.infer<typeof groupSchema>
