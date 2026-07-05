@@ -22,6 +22,9 @@ import { PageGuide } from '@/components/ui/PageGuide'
 import { TabBar } from '@/components/ui/TabBar'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 import { canDeleteGroup, canManageGroup } from '@/lib/permissions'
+import { PeriodPreview } from '@/components/availability/PeriodPreview'
+import { ActivityRulesFields, createDefaultActivityRules } from '@/components/availability/ActivityRulesFields'
+import type { ActivityRules } from '@/types/api'
 
 const eventSchema = z.object({
   name: z.string().min(1, 'イベント名を入力してください').max(255),
@@ -73,6 +76,15 @@ function todayDateInput(): string {
   return `${year}-${month}-${day}`
 }
 
+function dateInputAfter(days: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function GroupDetailPage() {
   const { groupId } = useParams<{ groupId: string }>()
   const navigate = useNavigate()
@@ -81,6 +93,7 @@ export function GroupDetailPage() {
   const [open, setOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [availabilitySetOpen, setAvailabilitySetOpen] = useState(false)
+  const [availabilityActivityRules, setAvailabilityActivityRules] = useState<ActivityRules>(() => createDefaultActivityRules())
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventSchema),
@@ -201,6 +214,7 @@ export function GroupDetailPage() {
         startDate: values.startDate,
         endDate: values.endDate,
         deadline: values.deadline || null,
+        activityRules: availabilityActivityRules,
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['group', groupId, 'common-availability-sets'] })
@@ -212,6 +226,7 @@ export function GroupDetailPage() {
         endDate: todayDateInput(),
         deadline: '',
       })
+      setAvailabilityActivityRules(createDefaultActivityRules())
       setActiveTab('availability')
     },
   })
@@ -232,6 +247,7 @@ export function GroupDetailPage() {
     () => (Array.isArray(commonAvailabilitySetsQuery.data) ? commonAvailabilitySetsQuery.data : []),
     [commonAvailabilitySetsQuery.data],
   )
+  const availabilitySetPreview = availabilitySetForm.watch()
   const deleteEventErrorMessage = deleteEventMutation.error instanceof Error ? deleteEventMutation.error.message : null
   const deleteGroupErrorMessage = deleteGroupMutation.error instanceof Error ? deleteGroupMutation.error.message : null
   const createInvitationErrorMessage = createInvitationMutation.error instanceof Error ? createInvitationMutation.error.message : null
@@ -363,13 +379,13 @@ export function GroupDetailPage() {
     <div className="space-y-4">
       <PageHeader
         title={group?.name ?? 'グループ詳細'}
-        description={group?.description ?? 'このグループを整理します。'}
+        description={group?.description}
         action={headerAction}
       />
 
       <PageGuide
         title="簡単ステップ"
-        description="今見ているタブに合わせて、短く案内します。"
+        description="次の操作だけ表示します。"
         items={guideItems}
       />
 
@@ -451,7 +467,7 @@ export function GroupDetailPage() {
           <Card className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
+                <Users className="h-5 w-5 text-slate-700" />
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">メンバー</h2>
                 </div>
@@ -471,7 +487,7 @@ export function GroupDetailPage() {
                       <UserAvatar
                         src={member.avatarUrl}
                         name={member.displayName}
-                        className="h-10 w-10 shrink-0 rounded-2xl bg-blue-100 text-blue-700"
+                        className="h-10 w-10 shrink-0 rounded-2xl bg-slate-100 text-slate-700"
                         iconClassName="h-4 w-4"
                       />
                       <div className="min-w-0">
@@ -529,7 +545,7 @@ export function GroupDetailPage() {
                         <p className="mt-1 text-sm text-slate-500">
                           期限 {invitation.expiresAt ? new Date(invitation.expiresAt).toLocaleDateString('ja-JP') : 'なし'}
                         </p>
-                        <p className="mt-3 inline-flex rounded-2xl bg-white px-4 py-2 font-mono text-lg font-bold tracking-[0.22em] text-blue-700 ring-1 ring-blue-100">
+                        <p className="mt-3 inline-flex rounded-2xl bg-white px-4 py-2 font-mono text-lg font-bold tracking-[0.22em] text-slate-700 ring-1 ring-slate-200">
                           {invitation.code ?? '未発行'}
                         </p>
                       </div>
@@ -598,7 +614,7 @@ export function GroupDetailPage() {
         <Card className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
+              <CalendarDays className="h-5 w-5 text-slate-700" />
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">イベント</h2>
               </div>
@@ -614,15 +630,17 @@ export function GroupDetailPage() {
             <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
               {events.map((event) => {
                 return (
-                  <div key={event.id} className="flex flex-col gap-4 p-4 transition hover:bg-blue-50/50 md:flex-row md:items-center">
+                  <div key={event.id} className="flex flex-col gap-4 p-4 transition hover:bg-slate-50 md:flex-row md:items-center">
                     <Link to={`/events/${event.id}`} className="min-w-0 flex-1">
                       <div className="flex items-start gap-3">
-                        <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                        <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
                           <CalendarDays className="h-5 w-5" />
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">{event.name}</p>
-                          <p className="mt-1 line-clamp-1 text-sm text-slate-500">{event.description || event.location || '説明はまだありません'}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-900">{event.name}</p>
+                          {event.description || event.location ? (
+                            <p className="mt-1 line-clamp-1 text-sm text-slate-500">{event.description || event.location}</p>
+                          ) : null}
                         </div>
                       </div>
                     </Link>
@@ -686,45 +704,46 @@ export function GroupDetailPage() {
         <Card className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-blue-600" />
+              <CalendarDays className="h-5 w-5 text-slate-700" />
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">期間</h2>
-                <p className="text-sm text-slate-500">イベントで使う確認期間を先に作り、あとで入力します。</p>
+                <h2 className="text-lg font-semibold text-slate-900">参加確認</h2>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {allowGroupManagement ? (
-                <Button variant="secondary" onClick={() => setAvailabilitySetOpen(true)}>
-                  期間を作る
+                <Button onClick={() => setAvailabilitySetOpen(true)}>
+                  新しく作る
                 </Button>
               ) : null}
               {commonAvailabilitySets[0] ? (
-                <Button onClick={() => navigate(`/availability-sets/${commonAvailabilitySets[0].id}`)}>
-                  いま入力する
+                <Button variant="secondary" onClick={() => navigate(`/availability-sets/${commonAvailabilitySets[0].id}`)}>
+                  入力する
                 </Button>
               ) : null}
             </div>
           </div>
 
           {commonAvailabilitySets.length ? (
-            <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="grid gap-3">
               {commonAvailabilitySets.map((set) => (
                 <Link
                   key={set.id}
                   to={`/availability-sets/${set.id}`}
-                  className="flex flex-col gap-3 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between"
+                  className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-[1px] hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-semibold text-slate-900">{set.name}</p>
-                      <Badge variant="brand">{set.availabilityCount}件</Badge>
                       <Badge variant="neutral">
                         {set.startDate} 〜 {set.endDate}
                       </Badge>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">{set.description || '説明はまだありません'}</p>
+                    {set.description ? <p className="mt-1 text-sm text-slate-500">{set.description}</p> : null}
                   </div>
-                  <Badge variant="info">開く</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="brand">{set.availabilityCount}件</Badge>
+                    <Badge variant="info">入力</Badge>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -739,11 +758,8 @@ export function GroupDetailPage() {
 
       <Modal title="メンバーを招待" open={inviteOpen} onClose={() => setInviteOpen(false)}>
         <form className="space-y-4" onSubmit={inviteForm.handleSubmit((values) => createInvitationMutation.mutate(values))}>
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-            <p className="text-sm font-semibold text-blue-900">招待コードを作成します</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              メールアドレスを入れると、そのメールアドレスの人だけが参加できます。空欄なら、コードを知っている人が参加できます。
-            </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-sm font-semibold text-slate-900">招待コードを作成</p>
           </div>
 
           <label className="block space-y-2">
@@ -825,17 +841,41 @@ export function GroupDetailPage() {
           className="space-y-4"
           onSubmit={availabilitySetForm.handleSubmit((values) => createCommonAvailabilitySetMutation.mutate(values))}
         >
-          <p className="text-sm leading-6 text-slate-500">イベントで使う確認期間を先に作ります。あとでイベントから選べます。</p>
+          <PeriodPreview
+            name={availabilitySetPreview.name}
+            startDate={availabilitySetPreview.startDate}
+            endDate={availabilitySetPreview.endDate}
+            deadline={availabilitySetPreview.deadline}
+          />
+
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: '1週間', days: 6 },
+              { label: '2週間', days: 13 },
+              { label: '1か月', days: 29 },
+            ].map((preset) => (
+              <Button
+                key={preset.label}
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  availabilitySetForm.setValue('startDate', todayDateInput(), { shouldValidate: true })
+                  availabilitySetForm.setValue('endDate', dateInputAfter(preset.days), { shouldValidate: true })
+                  if (!availabilitySetForm.getValues('name')) {
+                    availabilitySetForm.setValue('name', `${preset.label}の参加確認`, { shouldValidate: true })
+                  }
+                }}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">期間名</span>
+            <span className="text-sm font-medium text-slate-700">名前</span>
             <Input {...availabilitySetForm.register('name')} placeholder="夏休みの参加確認" />
             {availabilitySetForm.formState.errors.name ? <p className="text-sm text-rose-600">{availabilitySetForm.formState.errors.name.message}</p> : null}
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">説明</span>
-            <Textarea {...availabilitySetForm.register('description')} placeholder="この期間で集める内容" />
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -854,14 +894,20 @@ export function GroupDetailPage() {
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">締切</span>
             <DateField {...availabilitySetForm.register('deadline')} />
-            <p className="text-xs text-slate-500">未設定なら、あとでイベント側で調整できます。</p>
           </label>
+
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-slate-700">メモ</span>
+            <Textarea {...availabilitySetForm.register('description')} placeholder="例: 平日は放課後、休日は午前から確認" />
+          </label>
+
+          <ActivityRulesFields value={availabilityActivityRules} onChange={setAvailabilityActivityRules} />
 
           {createCommonAvailabilitySetMutation.error instanceof Error ? (
             <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{createCommonAvailabilitySetMutation.error.message}</p>
           ) : null}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex sm:items-center sm:justify-end sm:px-5">
             <Button type="button" variant="secondary" onClick={() => setAvailabilitySetOpen(false)}>
               キャンセル
             </Button>

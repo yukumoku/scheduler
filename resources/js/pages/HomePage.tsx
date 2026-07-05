@@ -50,16 +50,16 @@ export function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f7ff] px-4 py-8 text-slate-900">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
+      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-5xl items-center gap-6 lg:grid-cols-[1fr_0.92fr]">
         <section className="space-y-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm shadow-blue-200">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
-            <p className="text-lg font-bold tracking-tight text-slate-950">Alloca</p>
-            <p className="text-sm text-slate-500">予定は一度だけ聞く。シフトは何度でも作れる。</p>
+              <p className="text-lg font-bold tracking-tight text-slate-950">Alloca</p>
+              <p className="text-sm text-slate-500">クラスのシフト管理</p>
             </div>
           </div>
 
@@ -67,7 +67,7 @@ export function HomePage() {
             <Badge variant="brand">文化祭・部活・団体運営向け</Badge>
             <h1 className="max-w-3xl text-4xl font-bold tracking-tight text-slate-950 md:text-6xl">
               予定集めからシフト作成まで、
-              <span className="block text-blue-700">迷わず進める管理画面。</span>
+              <span className="block">迷わず進める管理画面。</span>
             </h1>
             <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
               Allocaは、イベントごとに班・作業を整理して、シフトを作れるサービスです。
@@ -100,13 +100,13 @@ export function HomePage() {
           ) : null}
         </section>
 
-        <Card className="space-y-5 border-blue-100 bg-white/90 p-5 shadow-xl shadow-blue-100/60">
-          <div className="rounded-[2rem] bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5">
-            <p className="text-sm font-semibold text-blue-700">使い方はシンプル</p>
+        <Card className="space-y-5 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <div className="rounded-[2rem] bg-slate-50 p-5">
+            <p className="text-sm font-semibold text-slate-700">使い方はシンプル</p>
             <div className="mt-4 space-y-3">
               {steps.map((step) => (
-                <div key={step} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-blue-100">
-                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                <div key={step} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-slate-200">
+                  <CheckCircle2 className="h-4 w-4 text-slate-700" />
                   <span className="text-sm font-medium text-slate-700">{step}</span>
                 </div>
               ))}
@@ -120,7 +120,7 @@ export function HomePage() {
               { icon: WandSparkles, label: 'シフトを出力' },
             ].map(({ icon: Icon, label }) => (
               <Card key={label} className="bg-slate-50">
-                <Icon className="h-5 w-5 text-blue-600" />
+                <Icon className="h-5 w-5 text-slate-700" />
                 <p className="mt-3 text-sm font-semibold text-slate-800">{label}</p>
               </Card>
             ))}

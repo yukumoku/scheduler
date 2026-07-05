@@ -89,7 +89,7 @@ export function GroupsPage() {
     <div className="space-y-4">
       <PageHeader
         title="グループ"
-        description="まずは活動スペースを選びましょう。イベントはグループの中で管理します。"
+        description="活動スペースを選びます。"
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setJoinOpen(true)}>
@@ -104,23 +104,15 @@ export function GroupsPage() {
 
       <PageGuide
         title="簡単ステップ"
-        description="グループの作り方と参加の入口だけ見ておきます。"
+        description="まずは参加する場所を選びます。"
         items={[
-          { title: 'グループを作成', description: '活動の土台になる場所をひとつ作ります。' },
-          { title: '招待コードで参加', description: '既存のグループにはコードで入れます。' },
-          { title: '開いて中身を見る', description: 'グループ詳細でイベントとメンバーを確認します。' },
-          { title: '自分の役割を確認', description: 'owner / member を見分けられます。' },
+          { title: '作る', description: '新しい活動スペースを作成します。' },
+          { title: '参加', description: '招待コードで入ります。' },
+          { title: '開く', description: 'イベントへ進みます。' },
         ]}
       />
 
       <Card className="space-y-4">
-        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
-          <p className="text-sm font-semibold text-slate-900">はじめて使うときの流れ</p>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            イベントを開く → 班を作る → 作業を作る → 各作業に時間枠を追加 → シフトを作成、の順で進めると迷いにくいです。
-          </p>
-        </div>
-
         {groups.length ? (
           <div className="divide-y divide-slate-200 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             {groups.map((group) => (
@@ -131,7 +123,7 @@ export function GroupsPage() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-semibold tracking-tight text-slate-950">{group.name}</p>
-                    <p className="mt-1 line-clamp-1 text-sm text-slate-500">{group.description || '説明はまだありません'}</p>
+                    {group.description ? <p className="mt-1 line-clamp-1 text-sm text-slate-500">{group.description}</p> : null}
                   </div>
                 </Link>
 
@@ -171,7 +163,7 @@ export function GroupsPage() {
         ) : (
           <EmptyState
             title="グループがまだありません"
-            description="最初に活動スペースを作ると、イベントやシフトをまとめて管理できます。"
+            description="作成するか、招待コードで参加します。"
             actionLabel="グループを作成"
             onAction={() => setOpen(true)}
           />
@@ -208,11 +200,8 @@ export function GroupsPage() {
 
       <Modal title="招待コードで参加" open={joinOpen} onClose={() => setJoinOpen(false)}>
         <form className="space-y-4" onSubmit={joinForm.handleSubmit((values) => joinMutation.mutate(values))}>
-          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-            <p className="text-sm font-semibold text-blue-900">招待コードを入力してください</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              オーナーから共有された8文字前後のコードでグループに参加できます。
-            </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <p className="text-sm font-semibold text-slate-900">コードで参加</p>
           </div>
 
           <label className="block space-y-2">

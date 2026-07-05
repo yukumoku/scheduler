@@ -38,7 +38,7 @@ export function InvitationAcceptPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f7ff] p-4 text-slate-900">
+    <div className="min-h-screen bg-slate-50 p-4 text-slate-900">
       <div className="mx-auto flex min-h-[calc(100vh-2rem)] max-w-xl items-center">
         <Card className="w-full space-y-6">
           {invitationQuery.isLoading ? (
@@ -48,16 +48,16 @@ export function InvitationAcceptPage() {
           ) : (
             <>
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
                   <Users className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-blue-600">Alloca 招待</p>
+                  <p className="text-sm font-medium text-slate-600">Alloca 招待</p>
                   <h1 className="text-2xl font-bold text-slate-900">{invitationQuery.data?.group?.name ?? 'グループ'} に参加</h1>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-sm leading-6 text-slate-600">
                   {invitationQuery.data?.inviter?.displayName ?? invitationQuery.data?.inviter?.email ?? 'メンバー'} さんから招待されています。
                 </p>
@@ -79,7 +79,7 @@ export function InvitationAcceptPage() {
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-slate-500">参加するにはログインが必要です。ログイン後、この招待リンクをもう一度開いてください。</p>
-                  <Link to="/login" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition hover:bg-blue-700">
+                  <Link to="/login" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-medium text-white transition hover:bg-slate-800">
                     <LogIn className="h-4 w-4" />
                     ログインへ
                   </Link>

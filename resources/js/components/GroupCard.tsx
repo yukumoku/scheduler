@@ -20,7 +20,7 @@ export function GroupCard({ group }: GroupCardProps) {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h3 className="truncate text-base font-semibold tracking-tight text-slate-950">{group.name}</h3>
-                <p className="mt-1 line-clamp-2 text-sm text-slate-500">{group.description || '説明はまだありません'}</p>
+                {group.description ? <p className="mt-1 line-clamp-2 text-sm text-slate-500">{group.description}</p> : null}
               </div>
               {group.myRole ? <Badge variant={group.myRole === 'owner' ? 'brand' : 'neutral'}>{group.myRole === 'owner' ? 'オーナー' : 'メンバー'}</Badge> : null}
             </div>

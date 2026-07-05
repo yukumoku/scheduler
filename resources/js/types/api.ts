@@ -53,7 +53,14 @@ export type CommonAvailabilitySet = {
   startDate: string | null
   endDate: string | null
   deadline: string | null
+  activityRules: ActivityRules
   availabilityCount: number
+}
+
+export type ActivityRules = {
+  weekly: Record<string, { enabled: boolean; startTime: string; endTime: string }>
+  excludedDates: string[]
+  specialDates: Array<{ date: string; startTime: string; endTime: string; note: string | null }>
 }
 
 export type CommonAvailability = {

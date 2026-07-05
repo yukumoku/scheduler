@@ -76,6 +76,18 @@ class CommonAvailabilitySetController extends Controller
             'startDate' => ['required', 'date'],
             'endDate' => ['required', 'date', 'after_or_equal:startDate'],
             'deadline' => ['nullable', 'date'],
+            'activityRules' => ['nullable', 'array'],
+            'activityRules.weekly' => ['nullable', 'array'],
+            'activityRules.weekly.*.enabled' => ['nullable', 'boolean'],
+            'activityRules.weekly.*.startTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.weekly.*.endTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.excludedDates' => ['nullable', 'array'],
+            'activityRules.excludedDates.*' => ['date'],
+            'activityRules.specialDates' => ['nullable', 'array'],
+            'activityRules.specialDates.*.date' => ['required_with:activityRules.specialDates', 'date'],
+            'activityRules.specialDates.*.startTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.endTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $set = $group->commonAvailabilitySets()->create([
@@ -84,6 +96,7 @@ class CommonAvailabilitySetController extends Controller
             'starts_at' => $validated['startDate'],
             'ends_at' => $validated['endDate'],
             'deadline' => $validated['deadline'] ?? null,
+            'activity_rules' => $validated['activityRules'] ?? null,
         ]);
 
         return response()->json([
@@ -115,6 +128,18 @@ class CommonAvailabilitySetController extends Controller
             'startDate' => ['required', 'date'],
             'endDate' => ['required', 'date', 'after_or_equal:startDate'],
             'deadline' => ['nullable', 'date'],
+            'activityRules' => ['nullable', 'array'],
+            'activityRules.weekly' => ['nullable', 'array'],
+            'activityRules.weekly.*.enabled' => ['nullable', 'boolean'],
+            'activityRules.weekly.*.startTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.weekly.*.endTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.excludedDates' => ['nullable', 'array'],
+            'activityRules.excludedDates.*' => ['date'],
+            'activityRules.specialDates' => ['nullable', 'array'],
+            'activityRules.specialDates.*.date' => ['required_with:activityRules.specialDates', 'date'],
+            'activityRules.specialDates.*.startTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.endTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $set = $event->availabilitySets()->create([
@@ -124,6 +149,7 @@ class CommonAvailabilitySetController extends Controller
             'starts_at' => $validated['startDate'],
             'ends_at' => $validated['endDate'],
             'deadline' => $validated['deadline'] ?? null,
+            'activity_rules' => $validated['activityRules'] ?? null,
         ]);
 
         if (! $event->common_availability_set_id) {
@@ -150,6 +176,18 @@ class CommonAvailabilitySetController extends Controller
             'startDate' => ['required', 'date'],
             'endDate' => ['required', 'date', 'after_or_equal:startDate'],
             'deadline' => ['nullable', 'date'],
+            'activityRules' => ['nullable', 'array'],
+            'activityRules.weekly' => ['nullable', 'array'],
+            'activityRules.weekly.*.enabled' => ['nullable', 'boolean'],
+            'activityRules.weekly.*.startTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.weekly.*.endTime' => ['nullable', 'date_format:H:i'],
+            'activityRules.excludedDates' => ['nullable', 'array'],
+            'activityRules.excludedDates.*' => ['date'],
+            'activityRules.specialDates' => ['nullable', 'array'],
+            'activityRules.specialDates.*.date' => ['required_with:activityRules.specialDates', 'date'],
+            'activityRules.specialDates.*.startTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.endTime' => ['required_with:activityRules.specialDates', 'date_format:H:i'],
+            'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $set->update([
@@ -158,6 +196,7 @@ class CommonAvailabilitySetController extends Controller
             'starts_at' => $validated['startDate'],
             'ends_at' => $validated['endDate'],
             'deadline' => $validated['deadline'] ?? null,
+            'activity_rules' => $validated['activityRules'] ?? null,
         ]);
 
         return response()->json([
@@ -191,6 +230,11 @@ class CommonAvailabilitySetController extends Controller
             'startDate' => $set->starts_at?->toDateString(),
             'endDate' => $set->ends_at?->toDateString(),
             'deadline' => $set->deadline?->toIso8601String(),
+            'activityRules' => $set->activity_rules ?? [
+                'weekly' => [],
+                'excludedDates' => [],
+                'specialDates' => [],
+            ],
             'availabilityCount' => $set->getAttribute('availabilities_count') ?? $set->availabilities()->count(),
         ];
     }

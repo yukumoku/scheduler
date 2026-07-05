@@ -87,17 +87,17 @@ export function AccountSettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
         <Card>
           <form className="space-y-4" onSubmit={form.handleSubmit((values) => updateMutation.mutate(values))}>
-            <div className="flex flex-col gap-4 rounded-3xl border border-blue-100 bg-blue-50/60 p-4 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center">
               <UserAvatar
                 src={avatarPreview}
                 name={meQuery.data?.displayName}
-                className="h-20 w-20 shrink-0 rounded-3xl bg-white text-blue-700 ring-1 ring-blue-100"
+                className="h-20 w-20 shrink-0 rounded-3xl bg-white text-slate-700 ring-1 ring-slate-200"
                 iconClassName="h-9 w-9"
               />
               <div className="min-w-0 flex-1 space-y-2">
                 <p className="font-semibold text-slate-900">プロフィール画像</p>
                 <p className="text-sm text-slate-500">JPG / PNG / WebP / GIF をアップロードできます。</p>
-                <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
+                <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
                   <ImagePlus className="h-4 w-4" />
                   画像を選択
                   <input
@@ -133,12 +133,12 @@ export function AccountSettingsPage() {
           </form>
         </Card>
 
-        <Card className="space-y-4 bg-blue-50/60">
+        <Card className="space-y-4 bg-slate-50/70">
           <div className="flex items-center gap-3">
             <UserAvatar
               src={meQuery.data?.avatarUrl}
               name={meQuery.data?.displayName}
-              className="h-12 w-12 rounded-2xl bg-white text-blue-700 ring-1 ring-blue-100"
+              className="h-12 w-12 rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200"
               iconClassName="h-6 w-6"
             />
             <div className="min-w-0">

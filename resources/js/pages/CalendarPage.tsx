@@ -93,10 +93,21 @@ function getStatusLabel(status: CalendarShiftItem['shiftStatus']): string {
   }
 }
 
+type CalendarGroupedEvents = {
+  groupId: string
+  groupName: string
+  events: Array<{
+    id: string
+    name: string
+  }>
+}
+
 export function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
+  const [selectedDateKey, setSelectedDateKey] = useState(() => formatDateKey(new Date()))
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([])
+  const [expandedGroupIds, setExpandedGroupIds] = useState<string[]>([])
   const [filtersReady, setFiltersReady] = useState(false)
 
   const calendarQuery = useQuery({
@@ -116,6 +127,7 @@ export function CalendarPage() {
 
     setSelectedGroupIds(groupIds)
     setSelectedEventIds(eventIds)
+    setExpandedGroupIds(groupIds)
     setFiltersReady(true)
   }, [calendarQuery.isSuccess, filtersReady, items])
 
@@ -157,6 +169,20 @@ export function CalendarPage() {
     [items],
   )
 
+  const eventsByGroup = useMemo<CalendarGroupedEvents[]>(() => {
+    return groupOptions
+      .map((group) => ({
+        groupId: group.id,
+        groupName: group.name,
+        events: eventOptions.filter((event) => event.groupId === group.id).map((event) => ({ id: event.id, name: event.name })),
+      }))
+      .filter((entry) => entry.events.length > 0)
+  }, [eventOptions, groupOptions])
+
+  const eventIdsByGroup = useMemo(() => {
+    return new Map(eventsByGroup.map((entry) => [entry.groupId, entry.events.map((event) => event.id)]))
+  }, [eventsByGroup])
+
   const filteredItems = useMemo(() => {
     return sortByDateTime(
       items.filter((item) => {
@@ -188,16 +214,30 @@ export function CalendarPage() {
       return groups
     }, {})
   }, [monthItems])
+  const selectedDayItems = itemsByDate[selectedDateKey] ?? []
 
   const toggleSelectedGroup = (groupId: string) => {
+    const childEventIds = eventIdsByGroup.get(groupId) ?? []
+
     setSelectedGroupIds((current) =>
       current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId],
+    )
+    setSelectedEventIds((current) =>
+      current.some((eventId) => childEventIds.includes(eventId))
+        ? current.filter((eventId) => !childEventIds.includes(eventId))
+        : Array.from(new Set([...current, ...childEventIds])),
     )
   }
 
   const toggleSelectedEvent = (eventId: string) => {
     setSelectedEventIds((current) =>
       current.includes(eventId) ? current.filter((id) => id !== eventId) : [...current, eventId],
+    )
+  }
+
+  const toggleExpandedGroup = (groupId: string) => {
+    setExpandedGroupIds((current) =>
+      current.includes(groupId) ? current.filter((id) => id !== groupId) : [...current, groupId],
     )
   }
 
@@ -217,6 +257,77 @@ export function CalendarPage() {
   }
 
   const upcomingItems = filteredItems.slice(0, 12)
+
+  const renderGroupTree = (dense: boolean) => {
+    const groupRowClass = dense
+      ? 'rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700'
+      : 'rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700 sm:text-sm'
+    const eventRowClass = dense
+      ? 'rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] text-slate-700'
+      : 'rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 sm:text-sm'
+
+    return (
+      <div className="space-y-3">
+        {groupOptions.length ? (
+          groupOptions.map((group) => {
+            const groupEventIds = eventIdsByGroup.get(group.id) ?? []
+            const selectedEventCount = groupEventIds.filter((eventId) => selectedEventIds.includes(eventId)).length
+            const isExpanded = expandedGroupIds.includes(group.id)
+            const isSelected = selectedGroupIds.includes(group.id)
+            const isIndeterminate = selectedEventCount > 0 && selectedEventCount < groupEventIds.length
+
+            return (
+              <div key={group.id} className="space-y-1.5">
+                <div className={`flex items-center gap-2 ${groupRowClass}`}>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    aria-checked={isIndeterminate ? 'mixed' : isSelected}
+                    onChange={() => toggleSelectedGroup(group.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandedGroup(group.id)}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <ChevronRight className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                    <FolderKanban className="h-4 w-4 shrink-0 text-slate-700" />
+                    <span className="min-w-0 truncate font-medium text-slate-900">{group.name}</span>
+                    <Badge variant="neutral" className="ml-auto px-2 py-0.5 text-[10px]">
+                      {selectedEventCount}/{groupEventIds.length}
+                    </Badge>
+                  </button>
+                </div>
+
+                {isExpanded ? (
+                  <div className="space-y-1.5 border-l border-slate-200 pl-4">
+                    {eventsByGroup
+                      .find((entry) => entry.groupId === group.id)
+                      ?.events.map((event) => (
+                        <label key={event.id} className={`${eventRowClass} flex items-start gap-2`}>
+                          <input
+                            type="checkbox"
+                            checked={selectedEventIds.includes(event.id)}
+                            onChange={() => toggleSelectedEvent(event.id)}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-200"
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-slate-900">{event.name}</span>
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })
+        ) : (
+          <p className={dense ? 'text-[11px] text-slate-500' : 'text-sm text-slate-500'}>グループの予定がありません。</p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -251,10 +362,10 @@ export function CalendarPage() {
         <div className="mt-3">
           <Card className="space-y-3 p-3">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-violet-600" />
+              <Filter className="h-4 w-4 text-slate-700" />
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">表示する予定</h2>
-                <p className="text-[11px] text-slate-500">チェックで切り替えます。</p>
+                <p className="text-[11px] text-slate-500">グループの下にイベントが並びます。</p>
               </div>
             </div>
 
@@ -262,68 +373,27 @@ export function CalendarPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <p className="inline-flex items-center gap-2 text-xs font-semibold text-slate-900">
-                    <FolderKanban className="h-4 w-4 text-violet-600" />
+                    <FolderKanban className="h-4 w-4 text-slate-700" />
                     グループ
                   </p>
                   <Badge variant="neutral" className="px-2 py-0.5 text-[10px]">
                     {selectedGroupIds.length}
                   </Badge>
                 </div>
-                <div className="space-y-1.5">
-                  {groupOptions.length ? (
-                    groupOptions.map((group) => (
-                      <label
-                        key={group.id}
-                        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-[11px] text-slate-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedGroupIds.includes(group.id)}
-                          onChange={() => toggleSelectedGroup(group.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-200"
-                        />
-                        <span className="min-w-0 truncate">{group.name}</span>
-                      </label>
-                    ))
-                  ) : (
-                    <p className="text-[11px] text-slate-500">グループの予定がありません。</p>
-                  )}
-                </div>
+                {renderGroupTree(true)}
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <p className="inline-flex items-center gap-2 text-xs font-semibold text-slate-900">
-                    <CalendarDays className="h-4 w-4 text-violet-600" />
+                    <CalendarDays className="h-4 w-4 text-slate-700" />
                     イベント
                   </p>
                   <Badge variant="neutral" className="px-2 py-0.5 text-[10px]">
                     {selectedEventIds.length}
                   </Badge>
                 </div>
-                <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1">
-                  {eventOptions.length ? (
-                    eventOptions.map((event) => (
-                      <label
-                        key={event.id}
-                        className="flex items-start gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-[11px] text-slate-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedEventIds.includes(event.id)}
-                          onChange={() => toggleSelectedEvent(event.id)}
-                          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-200"
-                        />
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-slate-900">{event.name}</span>
-                          <span className="mt-0.5 block truncate text-[10px] text-slate-500">{event.groupName ?? 'グループ未設定'}</span>
-                        </span>
-                      </label>
-                    ))
-                  ) : (
-                    <p className="text-[11px] text-slate-500">イベントの予定がありません。</p>
-                  )}
-                </div>
+                <p className="text-[11px] text-slate-500">イベントは各グループの下で選びます。</p>
               </div>
             </div>
           </Card>
@@ -336,72 +406,31 @@ export function CalendarPage() {
             <Filter className="h-4 w-4 text-violet-600" />
             <div>
               <h2 className="text-base font-semibold text-slate-900">表示する予定</h2>
-              <p className="text-xs text-slate-500">チェックで表示を切り替えます。</p>
+              <p className="text-xs text-slate-500">グループを開くと、その下にイベントが並びます。</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <FolderKanban className="h-4 w-4 text-violet-600" />
+                  <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <FolderKanban className="h-4 w-4 text-slate-700" />
                   グループ
                 </p>
                 <Badge variant="neutral">{selectedGroupIds.length}</Badge>
               </div>
-              <div className="space-y-2">
-                {groupOptions.length ? (
-                  groupOptions.map((group) => (
-                    <label
-                      key={group.id}
-                      className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700 sm:text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedGroupIds.includes(group.id)}
-                        onChange={() => toggleSelectedGroup(group.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-200"
-                      />
-                      <span className="min-w-0 truncate">{group.name}</span>
-                    </label>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">グループの予定がありません。</p>
-                )}
-              </div>
+              {renderGroupTree(false)}
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <CalendarDays className="h-4 w-4 text-violet-600" />
+                  <CalendarDays className="h-4 w-4 text-slate-700" />
                   イベント
                 </p>
                 <Badge variant="neutral">{selectedEventIds.length}</Badge>
               </div>
-              <div className="max-h-[18rem] space-y-2 overflow-y-auto pr-1 sm:max-h-[24rem]">
-                {eventOptions.length ? (
-                  eventOptions.map((event) => (
-                    <label
-                      key={event.id}
-                      className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-700 sm:text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedEventIds.includes(event.id)}
-                        onChange={() => toggleSelectedEvent(event.id)}
-                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-200"
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium text-slate-900">{event.name}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">{event.groupName ?? 'グループ未設定'}</span>
-                      </span>
-                    </label>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-500">イベントの予定がありません。</p>
-                )}
-              </div>
+              <p className="text-sm text-slate-500">イベントは各グループの下で選びます。</p>
             </div>
           </div>
         </Card>
@@ -440,76 +469,72 @@ export function CalendarPage() {
               ))}
             </div>
 
-            <div className="overflow-x-auto pb-2">
-              <div className="min-w-[21rem] grid grid-cols-7 gap-1 sm:min-w-[42rem] sm:gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {monthCells.map((cell, index) => {
                   if (!cell) {
-                    return <div key={`empty-${index}`} className="min-h-20 rounded-xl bg-slate-50/60 sm:min-h-32 sm:rounded-2xl" />
+                    return <div key={`empty-${index}`} className="aspect-square rounded-xl bg-slate-50/60" />
                   }
 
                   const dateKey = formatDateKey(cell)
                   const dayItems = itemsByDate[dateKey] ?? []
-                  const visibleDayItems = dayItems.slice(0, 3)
-                  const hiddenCount = Math.max(dayItems.length - visibleDayItems.length, 0)
+                  const selected = dateKey === selectedDateKey
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={dateKey}
+                      onClick={() => setSelectedDateKey(dateKey)}
                       className={[
-                        'min-h-20 rounded-xl border p-1.5 transition sm:min-h-32 sm:rounded-2xl sm:p-3',
-                        sameDay(cell, today) ? 'border-violet-200 bg-violet-50/50' : 'border-slate-200 bg-white',
+                        'aspect-square rounded-xl border p-1 text-left transition sm:rounded-2xl sm:p-2',
+                        selected ? 'border-slate-950 bg-slate-950 text-white shadow-sm' : sameDay(cell, today) ? 'border-slate-300 bg-slate-100 text-slate-950' : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50',
                       ].join(' ')}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[9px] font-semibold text-slate-900 sm:text-sm">{formatShortDate(cell)}</span>
-                        {sameDay(cell, today) ? <Badge variant="brand" className="px-1.5 py-0.5 text-[9px]">今日</Badge> : null}
+                      <div className="flex h-full flex-col justify-between">
+                        <span className={['text-[10px] font-semibold sm:text-sm', selected ? 'text-white' : 'text-slate-900'].join(' ')}>
+                          {cell.getDate()}
+                        </span>
+                        {dayItems.length ? (
+                          <div className="flex flex-wrap gap-0.5">
+                            {dayItems.slice(0, 4).map((item) => (
+                              <span
+                                key={item.id}
+                                className={['h-1.5 w-1.5 rounded-full', selected ? 'bg-white' : item.shiftStatus === 'published' ? 'bg-emerald-500' : 'bg-slate-400'].join(' ')}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
-
-                      <div className="mt-1.5 space-y-1 sm:mt-3 sm:space-y-2">
-                        {visibleDayItems.length ? (
-                          visibleDayItems.map((item) => (
-                            <Link
-                              key={item.id}
-                              to={`/shifts/${item.shiftId}`}
-                              className="block rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 text-left transition hover:-translate-y-[1px] hover:bg-white sm:rounded-xl sm:px-2.5 sm:py-2"
-                            >
-                              <div className="flex items-center justify-between gap-1">
-                                <p className="truncate text-[9px] font-semibold text-slate-900 sm:text-xs">
-                                  {formatClock(item.startTime)} - {formatClock(item.endTime)}
-                                </p>
-                                <Badge
-                                  variant={item.shiftStatus === 'published' ? 'success' : item.shiftStatus === 'generated' ? 'brand' : 'warning'}
-                                  className="px-1.5 py-0.5 text-[9px]"
-                                >
-                                  {getStatusLabel(item.shiftStatus)}
-                                </Badge>
-                              </div>
-                              <p className="mt-0.5 truncate text-[9px] text-slate-600 sm:text-xs">{item.eventName ?? 'イベント未設定'}</p>
-                              <p className="mt-0.5 truncate text-[9px] text-slate-500 sm:text-[11px]">{item.taskName ?? '作業未設定'}</p>
-                              <div className="mt-1 flex items-center gap-1.5">
-                                <UserAvatar
-                                  src={item.userAvatarUrl}
-                                  name={item.userName}
-                                  className="h-4 w-4 rounded-full bg-white text-slate-500 ring-1 ring-slate-200"
-                                  iconClassName="h-2.5 w-2.5"
-                                />
-                                <span className="truncate text-[9px] text-slate-500 sm:text-[11px]">
-                                  {item.userName ?? 'メンバー'}
-                                  {item.isLeader ? '・リーダー' : ''}
-                                </span>
-                              </div>
-                            </Link>
-                          ))
-                        ) : (
-                          <p className="text-[9px] text-slate-400 sm:text-xs">予定なし</p>
-                        )}
-
-                        {hiddenCount > 0 ? <p className="text-[9px] text-slate-400 sm:text-xs">+{hiddenCount}件</p> : null}
-                      </div>
-                    </div>
+                    </button>
                   )
                 })}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-950">{selectedDateKey}</h3>
+                  <p className="text-xs text-slate-500">{selectedDayItems.length ? `${selectedDayItems.length}件` : '予定なし'}</p>
+                </div>
               </div>
+              {selectedDayItems.length ? (
+                <div className="divide-y divide-slate-100">
+                  {selectedDayItems.map((item) => (
+                    <Link key={item.id} to={`/shifts/${item.shiftId}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-slate-50">
+                      <div className="w-14 shrink-0 text-xs font-semibold text-slate-500">
+                        {formatClock(item.startTime)}
+                      </div>
+                      <div className="h-10 w-1 shrink-0 rounded-full bg-slate-900" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-950">{item.taskName ?? item.eventName ?? '予定'}</p>
+                        <p className="truncate text-xs text-slate-500">{item.eventName ?? 'イベント未設定'}</p>
+                      </div>
+                      <UserAvatar src={item.userAvatarUrl} name={item.userName} className="h-8 w-8 rounded-full bg-slate-100 text-slate-500" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-4 py-6 text-sm text-slate-500">この日のシフトはありません。</p>
+              )}
             </div>
           </Card>
 

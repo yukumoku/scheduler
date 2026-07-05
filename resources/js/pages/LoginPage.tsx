@@ -1,9 +1,9 @@
 import { CalendarDays, Sparkles, Users, WandSparkles } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { authRedirectUrl } from '@/lib/api'
+import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 
 function GoogleIcon() {
   return (
@@ -28,16 +28,8 @@ function LineIcon() {
 }
 
 const providers = [
-  {
-    key: 'google',
-    label: 'Googleでログイン',
-    href: authRedirectUrl('google'),
-  },
-  {
-    key: 'line',
-    label: 'LINEでログイン',
-    href: authRedirectUrl('line'),
-  },
+  { key: 'google', label: 'Googleでログイン', href: authRedirectUrl('google') },
+  { key: 'line', label: 'LINEでログイン', href: authRedirectUrl('line') },
 ] as const
 
 export function LoginPage() {
@@ -45,28 +37,27 @@ export function LoginPage() {
   const errorMessage = new URLSearchParams(location.search).get('error')
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(237,233,254,0.55),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(219,234,254,0.45),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#f8fafc_100%)] px-4 py-8 text-slate-900">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
+      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-8 lg:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)]">
         <section className="space-y-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-violet-700 shadow-sm ring-1 ring-slate-200">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
               <CalendarDays className="h-5 w-5" />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Alloca</p>
-              <p className="text-sm text-slate-500">予定は一度だけ聞く</p>
+              <p className="text-sm text-slate-500">クラスのシフト管理</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <Badge variant="brand">文化祭の夏休み管理</Badge>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl">
-              予定を集めて、見通しよく。
-              <span className="block text-violet-700">チームの動きをひとつに。</span>
+              予定を集めて、
+              <span className="block">そのまま整える。</span>
             </h1>
             <p className="max-w-xl text-base leading-7 text-slate-600 md:text-lg">
-              グループ、イベント、シフト準備の土台をひとつの画面で管理できます。
-              まずはGoogleまたはLINEでログインしてください。
+              グループ、イベント、班、シフトをひとつにまとめます。まずはGoogleかLINEで始めてください。
             </p>
           </div>
 
@@ -75,15 +66,15 @@ export function LoginPage() {
               const icon = provider.key === 'google' ? <GoogleIcon /> : <LineIcon />
 
               return (
-                <a key={provider.key} href={provider.href} className="block">
-                  <Button variant="secondary" size="lg" className="w-full justify-center" leftIcon={icon}>
+                <a key={provider.key} href={provider.href} className="block w-full">
+                  <Button variant="secondary" size="lg" className="w-full justify-center whitespace-nowrap px-5 text-sm sm:text-base" leftIcon={icon}>
                     {provider.label}
                   </Button>
                 </a>
               )
             })}
           </div>
-          <Link to="/signup" className="inline-flex text-sm font-semibold text-violet-700 hover:text-violet-800">
+          <Link to="/signup" className="inline-flex w-full justify-center text-sm font-semibold text-slate-700 hover:text-slate-950 sm:w-auto sm:justify-start">
             初めて使う方は新規アカウント作成へ
           </Link>
 
@@ -95,12 +86,12 @@ export function LoginPage() {
 
           <div className="grid gap-3 md:grid-cols-3">
             {[
-              { icon: Users, label: 'メンバー管理' },
-              { icon: Sparkles, label: 'イベント整理' },
-              { icon: WandSparkles, label: 'シフト準備' },
+              { icon: Users, label: '招待コードで参加' },
+              { icon: CalendarDays, label: '予定入力を簡単に' },
+              { icon: WandSparkles, label: 'シフトを出力' },
             ].map(({ icon: Icon, label }) => (
-              <Card key={label} className="flex items-center gap-3 bg-white/85">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-violet-700 ring-1 ring-slate-200">
+              <Card key={label} className="flex items-center gap-3 bg-slate-50">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200">
                   <Icon className="h-4 w-4" />
                 </div>
                 <p className="text-sm font-medium text-slate-700">{label}</p>
@@ -109,13 +100,13 @@ export function LoginPage() {
           </div>
         </section>
 
-        <Card className="space-y-5 border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_80px_rgba(15,23,42,0.08)] backdrop-blur">
-          <div className="rounded-3xl bg-gradient-to-br from-slate-50 via-white to-violet-50/60 p-6">
-            <p className="text-sm font-semibold text-violet-700">MVPでできること</p>
+        <Card className="space-y-5 border-slate-200/80 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <div className="rounded-3xl bg-slate-50 p-6">
+            <p className="text-sm font-semibold text-slate-700">まずできること</p>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-              <li>・所属グループの一覧表示</li>
-              <li>・イベントの作成と確認</li>
-              <li>・スマホでも見やすいレイアウト</li>
+              <li>・グループを見る</li>
+              <li>・イベントを作る</li>
+              <li>・予定を集める</li>
             </ul>
           </div>
 

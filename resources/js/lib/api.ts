@@ -1,6 +1,7 @@
 import type {
   ApiResponse,
   AuthUser,
+  ActivityRules,
   CommonAvailability,
   CommonAvailabilitySet,
   CommonAvailabilityMeSlot,
@@ -212,6 +213,7 @@ export const api = {
         startDate: string
         endDate: string
         deadline: string | null
+        activityRules?: ActivityRules
       },
     ) =>
       request<CommonAvailabilitySet>(`/groups/${groupId}/common-availability-sets`, {
@@ -328,6 +330,7 @@ export const api = {
         startDate: string
         endDate: string
         deadline: string | null
+        activityRules?: ActivityRules
       },
     ) =>
       request<CommonAvailabilitySet>(`/common-availability-sets/${setId}`, {

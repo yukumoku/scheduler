@@ -127,7 +127,7 @@ export function TutorialPage() {
   if (meQuery.isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f3f7ff] px-4 text-slate-900">
-        <div className="rounded-[1.75rem] border border-blue-100 bg-white p-8 shadow-sm">
+        <div className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-sm">
           <LoadingSpinner />
         </div>
       </div>
@@ -150,7 +150,7 @@ export function TutorialPage() {
         : 'はじめる'
 
   return (
-    <div className="min-h-screen bg-[#f3f7ff] px-4 py-8 text-slate-900">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-3xl items-center">
         <div className="w-full space-y-4">
           <div className="space-y-2">
@@ -163,10 +163,10 @@ export function TutorialPage() {
             </p>
           </div>
 
-          <Card className="space-y-5 border-blue-100 bg-white/95 shadow-sm">
+          <Card className="space-y-5 bg-white shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-blue-700">チュートリアル</p>
+                <p className="text-sm font-semibold text-slate-700">チュートリアル</p>
                 <h2 className="text-lg font-semibold text-slate-900">{stepTitle}</h2>
                 <p className="text-sm leading-6 text-slate-500">
                   {tutorialStep === 'profile'
@@ -187,7 +187,7 @@ export function TutorialPage() {
 
             <div className="h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+                className="h-full rounded-full bg-slate-950 transition-all duration-500"
                 style={{ width: `${((stepIndex + 1) / 3) * 100}%` }}
               />
             </div>
@@ -200,10 +200,10 @@ export function TutorialPage() {
                       <UserAvatar
                         src={avatarPreview}
                         name={displayName || meQuery.data.displayName}
-                        className="h-24 w-24 rounded-[2rem] bg-white text-blue-700 ring-1 ring-blue-100 shadow-sm"
+                        className="h-24 w-24 rounded-[2rem] bg-white text-slate-700 ring-1 ring-slate-200 shadow-sm"
                         iconClassName="h-10 w-10"
                       />
-                      <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 text-sm font-medium text-blue-700 transition hover:bg-blue-50">
+                      <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
                         <ImagePlus className="h-4 w-4" />
                         画像を選ぶ
                         <input
@@ -268,13 +268,13 @@ export function TutorialPage() {
 
               {tutorialStep === 'guide' ? (
                 <>
-                  <div className="rounded-3xl border border-blue-100 bg-blue-50/60 p-5">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50/70 p-5">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-blue-700 ring-1 ring-blue-100">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200">
                         <CircleHelp className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-blue-700">つかいかた</p>
+                        <p className="text-sm font-semibold text-slate-700">つかいかた</p>
                         <h3 className="text-base font-semibold text-slate-950">グループ → イベント → 班 → 作業</h3>
                       </div>
                     </div>

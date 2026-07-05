@@ -177,7 +177,7 @@ export function CommonAvailabilitySetPage() {
               date,
               startTime: '09:00',
               endTime: '12:00',
-              status: 'unavailable',
+              status: 'available',
               comment: '',
             },
           ],
@@ -225,7 +225,7 @@ export function CommonAvailabilitySetPage() {
         date: modalDate,
         startTime: '09:00',
         endTime: '12:00',
-        status: 'unavailable',
+        status: 'available',
         comment: '',
       },
     ])
@@ -236,10 +236,10 @@ export function CommonAvailabilitySetPage() {
   }
 
   return (
-    <div className="space-y-4 pb-32">
+    <div className="space-y-4 pb-44 md:pb-32">
       <PageHeader
         title={setData?.name ?? '参加可能日時'}
-        description={setData?.description ?? 'みんなの来れる時間を、ひとつにまとめます。'}
+        description={setData?.description ?? '行ける時間だけ入力します。'}
         action={
           <Button variant="secondary" onClick={() => navigate(-1)}>
             戻る
@@ -255,14 +255,12 @@ export function CommonAvailabilitySetPage() {
           <Badge variant="brand">期限 {setData?.deadline ?? 'なし'}</Badge>
           <Badge variant="info">{setData?.availabilityCount ?? 0}件提出</Badge>
         </div>
-        <p className="text-sm leading-6 text-slate-500">このセットは、イベントで使い回せる共通の入力です。</p>
       </Card>
 
       <Card className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">関連イベント</h2>
-            <p className="text-sm text-slate-500">このセットを使うイベントを一覧で見ます。</p>
           </div>
           <Badge variant="info">{relatedEvents.length}件</Badge>
         </div>
@@ -283,10 +281,7 @@ export function CommonAvailabilitySetPage() {
             ))}
           </div>
         ) : (
-          <EmptyState
-            title="まだ関連イベントはありません"
-            description="イベント詳細からこの参加可能日時セットを紐づけると、ここに表示されます。"
-          />
+          <EmptyState title="関連イベントはありません" description="イベント側で使うと表示されます。" />
         )}
       </Card>
 
@@ -321,7 +316,6 @@ export function CommonAvailabilitySetPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">カレンダー</h2>
-                <p className="text-sm text-slate-500">期間内の日だけ押せます。押した日がそのまま入力の入口になります。</p>
               </div>
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Badge variant="brand">{periodDates.length}日</Badge>
@@ -342,7 +336,7 @@ export function CommonAvailabilitySetPage() {
                       }}
                       disabled={!activeMonthCursor || activeMonthCursor <= periodDates[0].slice(0, 7)}
                     >
-                      前の月
+                      前
                     </Button>
                     <Button
                       type="button"
@@ -353,7 +347,7 @@ export function CommonAvailabilitySetPage() {
                       }}
                       disabled={!activeMonthCursor || activeMonthCursor >= periodDates[periodDates.length - 1].slice(0, 7)}
                     >
-                      次の月
+                      次
                     </Button>
                   </div>
                   <p className="text-sm font-medium text-slate-600">
@@ -363,7 +357,7 @@ export function CommonAvailabilitySetPage() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-7 gap-2 text-center text-xs font-medium text-slate-500">
+                <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-medium text-slate-500 sm:gap-2">
                   {['日', '月', '火', '水', '木', '金', '土'].map((day) => (
                     <div key={day} className="py-1">
                       {day}
@@ -371,9 +365,9 @@ export function CommonAvailabilitySetPage() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
                   {Array.from({ length: activeMonthCursor ? new Date(`${activeMonthCursor}-01T00:00:00`).getDay() : 0 }).map((_, index) => (
-                    <div key={`blank-${index}`} className="h-20 rounded-2xl" />
+                    <div key={`blank-${index}`} className="h-12 rounded-xl sm:h-20 sm:rounded-2xl" />
                   ))}
                   {activeMonthDates.map((date) => {
                       const weekdayLabel = new Intl.DateTimeFormat('ja-JP', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))
@@ -385,7 +379,7 @@ export function CommonAvailabilitySetPage() {
                           type="button"
                           onClick={() => openDateModal(date)}
                           className={[
-                            'flex h-20 flex-col justify-between rounded-2xl border p-2 text-left transition',
+                            'flex h-12 flex-col justify-between rounded-xl border p-1.5 text-left transition sm:h-20 sm:rounded-2xl sm:p-2',
                             hasEntries
                               ? 'border-violet-300 bg-violet-50 text-violet-700 shadow-sm'
                               : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -393,10 +387,10 @@ export function CommonAvailabilitySetPage() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold">{date.slice(8, 10)}</span>
-                            <span className="text-[11px] text-slate-400">{weekdayLabel}</span>
+                            <span className="hidden text-[11px] text-slate-400 sm:inline">{weekdayLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] text-slate-400">期間内</span>
+                            <span className="hidden text-[11px] text-slate-400 sm:inline">期間内</span>
                             <Badge variant={hasEntries ? 'brand' : 'neutral'} className="px-2 py-0.5 text-[10px]">
                               {hasEntries ? `${dayEntries.length}件` : '＋'}
                             </Badge>
@@ -415,7 +409,6 @@ export function CommonAvailabilitySetPage() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">入力済みの日時</h2>
-                <p className="text-sm text-slate-500">モーダルで入れた内容を一覧で見られます。</p>
               </div>
               <Button type="button" variant="secondary" onClick={() => setActiveTab('submissions')}>
                 提出状況を見る
@@ -443,7 +436,7 @@ export function CommonAvailabilitySetPage() {
                 ))}
               </div>
             ) : (
-              <EmptyState title="まだ日時はありません" description="カレンダーから日付を押して入力してください。" />
+              <EmptyState title="まだ入力はありません" description="日付を押して時間を入れます。" />
             )}
           </Card>
         </div>
@@ -560,10 +553,6 @@ export function CommonAvailabilitySetPage() {
         onClose={closeDateModal}
       >
         <div className="space-y-4">
-          <p className="text-sm leading-6 text-slate-500">
-            5分単位で時間を入れられます。ひとつの日に複数の時間帯をまとめて入れてください。
-          </p>
-
           <div className="space-y-3">
             {modalDrafts.map((draft, index) => (
               <div key={`${index}-${draft.startTime}-${draft.endTime}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -625,15 +614,15 @@ export function CommonAvailabilitySetPage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Button type="button" variant="secondary" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft}>
+          <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <Button type="button" variant="secondary" className="w-full sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft}>
               時間を追加
             </Button>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={closeDateModal}>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={closeDateModal}>
                 キャンセル
               </Button>
-              <Button type="button" onClick={saveDateModal}>
+              <Button type="button" className="w-full sm:w-auto" onClick={saveDateModal}>
                 保存
               </Button>
             </div>
@@ -641,10 +630,10 @@ export function CommonAvailabilitySetPage() {
         </div>
       </Modal>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:left-72">
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200 bg-white/95 px-3 py-2 backdrop-blur md:bottom-0 md:left-72 md:px-4 md:py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <p className="text-sm text-slate-500">{saveMutation.isPending ? '保存中...' : '内容を保存してください'}</p>
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || savedDrafts.length === 0} leftIcon={<Save className="h-4 w-4" />}>
+          <p className="hidden text-sm text-slate-500 sm:block">{saveMutation.isPending ? '保存中...' : '入力後に保存します'}</p>
+          <Button className="w-full sm:w-auto" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || savedDrafts.length === 0} leftIcon={<Save className="h-4 w-4" />}>
             希望を保存
           </Button>
         </div>

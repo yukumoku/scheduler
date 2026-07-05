@@ -71,7 +71,7 @@ export function DashboardPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-slate-900">{group.name}</p>
-                      <p className="mt-1 truncate text-sm text-slate-500">{group.description || '説明はまだありません'}</p>
+                      {group.description ? <p className="mt-1 truncate text-sm text-slate-500">{group.description}</p> : null}
                     </div>
                     <Badge variant="neutral">{group.memberCount}人</Badge>
                   </div>

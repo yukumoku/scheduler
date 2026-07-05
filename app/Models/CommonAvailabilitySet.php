@@ -10,12 +10,13 @@ class CommonAvailabilitySet extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['group_id', 'event_id', 'name', 'description', 'starts_at', 'ends_at', 'deadline'];
+    protected $fillable = ['group_id', 'event_id', 'name', 'description', 'starts_at', 'ends_at', 'deadline', 'activity_rules'];
 
     protected $casts = [
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
         'deadline' => 'datetime',
+        'activity_rules' => 'array',
     ];
 
     public function group(): BelongsTo

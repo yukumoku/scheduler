@@ -77,16 +77,16 @@ export function SignupPage() {
 
   if (!meQuery.data) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(237,233,254,0.55),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(219,234,254,0.45),_transparent_30%),linear-gradient(180deg,_#f8fafc_0%,_#f8fafc_100%)] px-4 py-8 text-slate-900">
+      <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
         <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-xl items-center">
           <div className="w-full space-y-4">
             <Card className="space-y-6 p-6">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-violet-700 shadow-sm ring-1 ring-slate-200">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white shadow-sm">
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-violet-700">Allocaを始める</p>
+                  <p className="text-sm font-semibold text-slate-700">Allocaを始める</p>
                   <h1 className="text-2xl font-semibold tracking-tight text-slate-950">アカウント作成</h1>
                 </div>
               </div>
@@ -112,10 +112,10 @@ export function SignupPage() {
               </div>
             </Card>
 
-            <Card className="space-y-3 border-blue-100 bg-white/95 shadow-sm">
+            <Card className="space-y-3 bg-white shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-blue-700">流れ</p>
+                  <p className="text-sm font-semibold text-slate-700">流れ</p>
                   <h2 className="text-lg font-semibold text-slate-900">1つずつ、静かに進みます</h2>
                 </div>
                 <Badge variant="brand">1 / 2</Badge>
@@ -135,11 +135,11 @@ export function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f7ff] px-4 py-8 text-slate-900">
+    <div className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-xl items-center">
         <Card className="w-full space-y-5 p-5">
           <div>
-            <p className="text-sm font-semibold text-violet-700">最初の設定</p>
+            <p className="text-sm font-semibold text-slate-700">最初の設定</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">プロフィールを決めましょう</h1>
             <p className="mt-2 text-sm leading-7 text-slate-600">グループやシフトで表示される名前とアイコンです。あとから変更できます。</p>
           </div>
@@ -149,10 +149,10 @@ export function SignupPage() {
               <UserAvatar
                 src={avatarPreview}
                 name={displayName || meQuery.data.displayName}
-                className="h-28 w-28 rounded-[2rem] bg-white text-violet-700 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200"
+                className="h-28 w-28 rounded-[2rem] bg-white text-slate-700 shadow-lg shadow-slate-200/60 ring-1 ring-slate-200"
                 iconClassName="h-10 w-10"
               />
-              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-violet-700 transition hover:-translate-y-0.5 hover:bg-slate-50">
+              <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50">
                 <ImagePlus className="h-4 w-4" />
                 画像を選ぶ
                 <input

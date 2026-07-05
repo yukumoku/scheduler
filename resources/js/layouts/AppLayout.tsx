@@ -9,7 +9,6 @@ import {
   LogOut,
   PanelLeft,
   Settings,
-  Sparkles,
   WandSparkles,
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
@@ -70,8 +69,8 @@ export function AppLayout() {
 
   if (meQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,_rgba(237,233,254,0.55),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(219,234,254,0.45),_transparent_22%),linear-gradient(180deg,_#f8fafc_0%,_#f8fafc_100%)] px-4 text-slate-900">
-        <div className="rounded-[1.75rem] border border-slate-200/80 bg-white p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-900">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
           <LoadingSpinner />
         </div>
       </div>
@@ -80,18 +79,17 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900 md:flex">
-      <aside className="hidden w-72 border-r border-slate-200/80 bg-white/85 px-4 py-5 backdrop-blur md:flex md:flex-col">
+      <aside className="hidden w-72 border-r border-slate-200/80 bg-white/92 px-4 py-5 backdrop-blur md:flex md:flex-col">
         <div className="alloca-fade-up mb-7 flex items-center gap-3 px-2">
-          <div className="alloca-float flex h-12 w-12 items-center justify-center rounded-[1.25rem] bg-gradient-to-br from-violet-500 to-sky-500 text-white shadow-sm shadow-violet-200">
-            <Sparkles className="h-5 w-5" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white shadow-sm">
+            A
           </div>
           <div>
             <p className="text-lg font-bold tracking-tight text-slate-950">Alloca</p>
-            <p className="text-xs font-medium text-slate-500">予定は一度だけ聞く</p>
+            <p className="text-xs font-medium text-slate-500">Shift workspace</p>
           </div>
         </div>
 
-        <div className="mb-3 px-3 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Main</div>
         <nav className="space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -103,13 +101,13 @@ export function AppLayout() {
                   [
                     'group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-semibold transition-all duration-200',
                     isActive
-                      ? 'bg-violet-50 text-violet-700 shadow-sm shadow-violet-100 ring-1 ring-violet-100'
-                      : 'text-slate-600 hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-950',
+                      ? 'bg-slate-950 text-white shadow-sm'
+                      : 'text-slate-600 hover:-translate-y-[1px] hover:bg-slate-100 hover:text-slate-950',
                   ].join(' ')
                 }
               >
                 <span className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm ring-1 ring-slate-100 group-hover:text-violet-600">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm ring-1 ring-slate-100 group-hover:text-slate-950">
                     <Icon className="h-4 w-4" />
                   </span>
                   {item.label}
@@ -121,8 +119,8 @@ export function AppLayout() {
         </nav>
 
         <div className="mt-7 flex items-center justify-between px-3">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Workspaces</p>
-          <NavLink to="/groups" className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+          <p className="text-[11px] font-bold tracking-[0.12em] text-slate-400">グループ</p>
+          <NavLink to="/groups" className="text-xs font-semibold text-slate-600 hover:text-slate-950">
             管理
           </NavLink>
         </div>
@@ -135,13 +133,13 @@ export function AppLayout() {
                 [
                   'group flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm transition-all duration-200',
                   isActive
-                    ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-100 shadow-sm'
-                    : 'text-slate-600 hover:-translate-y-[1px] hover:bg-slate-50 hover:text-slate-950',
+                    ? 'bg-slate-950 text-white shadow-sm'
+                    : 'text-slate-600 hover:-translate-y-[1px] hover:bg-slate-100 hover:text-slate-950',
                 ].join(' ')
               }
             >
               <span className="flex min-w-0 items-center gap-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-100 to-sky-100 text-xs font-bold text-violet-700">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-700 ring-1 ring-slate-200">
                   {group.name.slice(0, 1)}
                 </span>
                 <span className="truncate font-medium">{group.name}</span>
@@ -152,18 +150,18 @@ export function AppLayout() {
             </NavLink>
           ))}
           {groupsQuery.data?.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/60 p-3 text-sm text-slate-500">
-              グループを作ると、ここから活動スペースへ移動できます。
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+              まだグループがありません。
             </div>
           ) : null}
         </div>
 
-        <div className="alloca-fade-up mt-auto space-y-4 rounded-[1.5rem] border border-slate-200/80 bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm">
+        <div className="alloca-fade-up mt-auto space-y-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <UserAvatar
               src={meQuery.data?.avatarUrl}
               name={meQuery.data?.displayName}
-              className="h-10 w-10 rounded-2xl bg-slate-100 text-violet-700 ring-1 ring-slate-200"
+              className="h-10 w-10 rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200"
               iconClassName="h-5 w-5"
             />
             <div className="min-w-0">
@@ -198,15 +196,14 @@ export function AppLayout() {
       </aside>
 
       <main className="flex-1">
-        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/86 backdrop-blur">
           <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-6">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-violet-700 shadow-sm md:hidden">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 shadow-sm md:hidden">
                 <PanelLeft className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Group Workspace</p>
-                <p className="text-sm font-medium text-slate-600">グループ → イベント → 作業 → シフト</p>
+                <p className="text-sm font-medium text-slate-600">Alloca</p>
               </div>
             </div>
 
@@ -217,7 +214,7 @@ export function AppLayout() {
               <UserAvatar
                 src={meQuery.data?.avatarUrl}
                 name={meQuery.data?.displayName}
-                className="h-9 w-9 shrink-0 rounded-xl bg-white text-violet-700 ring-1 ring-slate-200"
+                className="h-9 w-9 shrink-0 rounded-xl bg-white text-slate-700 ring-1 ring-slate-200"
                 iconClassName="h-4 w-4"
               />
               <span className="min-w-0">
@@ -243,7 +240,7 @@ export function AppLayout() {
                   className={({ isActive }) =>
                     [
                       'flex flex-col items-center gap-1 rounded-2xl px-2 py-3 text-[11px] font-semibold transition-all duration-200',
-                      isActive ? 'bg-violet-50 text-violet-700 shadow-sm' : 'text-slate-500 hover:bg-slate-100',
+                      isActive ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100',
                     ].join(' ')
                   }
                 >

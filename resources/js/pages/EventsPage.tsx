@@ -80,7 +80,7 @@ export function EventsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-base font-semibold tracking-tight text-slate-950">{event.name}</p>
-                      <p className="mt-2 line-clamp-2 text-sm text-slate-500">{event.description || '説明はまだありません'}</p>
+                      {event.description ? <p className="mt-2 line-clamp-2 text-sm text-slate-500">{event.description}</p> : null}
                     </div>
                     <Badge variant={event.status === 'collecting' ? 'warning' : event.status === 'published' ? 'success' : 'brand'}>
                       {event.status === 'draft'

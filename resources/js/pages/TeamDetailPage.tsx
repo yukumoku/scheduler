@@ -19,7 +19,6 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { DateField } from '@/components/ui/DateField'
 import { canCreateTask, canEditTeam } from '@/lib/permissions'
-import { Link } from 'react-router-dom'
 
 const teamSchema = z.object({
   name: z.string().min(1, '班名を入力してください').max(255),
@@ -541,7 +540,7 @@ export function TeamDetailPage() {
                             </Badge>
                           </div>
                         ) : null}
-                        <p className="mt-1 text-sm leading-6 text-slate-500">{task.description || '説明はまだありません。'}</p>
+                        {task.description ? <p className="mt-1 text-sm leading-6 text-slate-500">{task.description}</p> : null}
                         {task.requiredMemberIds?.length ? (
                           <div className="mt-2 space-y-2">
                             <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">担当メンバー</p>
@@ -577,17 +576,10 @@ export function TeamDetailPage() {
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-slate-600">
                       <p>{task.desiredTotalHours ? `合計 ${task.desiredTotalHours}h` : '必要時間未設定'}</p>
-                      <p className="text-xs text-slate-500">同時 {task.requiredPeoplePerSlot ?? 1}人</p>
                       <Badge variant={task.slotCount ? 'brand' : 'neutral'}>{task.slotCount ? `${task.slotCount}候補` : '0候補'}</Badge>
                     </div>
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    <Link
-                      to={`/events/${team?.eventId}?tab=tasks`}
-                      className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      詳細を見る
-                    </Link>
                     {canManage && !isDefaultTeam ? (
                       <ActionMenu
                         triggerLabel={`${task.name}の操作`}
@@ -865,11 +857,11 @@ export function TeamDetailPage() {
             </Select>
             {availabilitySets.length ? (
               <p className="text-xs leading-6 text-slate-500">
-                選択中: {selectedWorkPeriod?.name ?? '期間なし'}
+                選択中: {selectedWorkPeriod?.name ?? '未選択'}
                 {selectedWorkPeriod ? `（${selectedWorkPeriod.startDate ?? '未設定'} 〜 ${selectedWorkPeriod.endDate ?? '未設定'}）` : ''}
               </p>
             ) : (
-              <p className="text-xs leading-6 text-slate-500">期間がなくても作成できます。あとから期間を付けることもできます。</p>
+              <p className="text-xs leading-6 text-slate-500">先にイベントで期間を作ると、ここで選べます。</p>
             )}
           </div>
 
@@ -929,27 +921,11 @@ export function TeamDetailPage() {
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <label className="block space-y-2">
               <span className="text-sm font-medium text-slate-700">合計で必要な作業時間</span>
               <Input type="number" min={0.5} step="0.5" {...taskForm.register('desiredTotalHours')} placeholder="例: 4" />
               <p className="text-xs leading-6 text-slate-500">作業そのものに必要な時間です。2人で1時間入っても、ここでは1時間として扱います。</p>
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">同時に入る人数</span>
-              <Input type="number" min={1} step={1} {...taskForm.register('requiredPeoplePerSlot', { valueAsNumber: true })} placeholder="例: 2" />
-              <p className="text-xs leading-6 text-slate-500">同じ時間帯に必要な人数です。1人で進める作業なら1のままで大丈夫です。</p>
-            </label>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">並び順</span>
-              <Input type="number" min={0} {...taskForm.register('sortOrder')} />
-            </label>
-            <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">色</span>
-              <Input type="color" className="h-11 w-full px-2" {...taskForm.register('color')} />
             </label>
           </div>
 

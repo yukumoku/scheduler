@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api } from '@/lib/api'
-import type { EventSlot, Team, Shift, ShiftGenerateResult } from '@/types/api'
+import type { ActivityRules, EventSlot, Team, Shift, ShiftGenerateResult, ShiftGenerationSetting, ShiftRule } from '@/types/api'
 import { ActionMenu } from '@/components/ui/ActionMenu'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -32,6 +32,8 @@ import { Textarea } from '@/components/ui/Textarea'
 import { DateField } from '@/components/ui/DateField'
 import { TabBar } from '@/components/ui/TabBar'
 import { canManageEvent, canManageGroup } from '@/lib/permissions'
+import { PeriodPreview } from '@/components/availability/PeriodPreview'
+import { ActivityRulesFields, createDefaultActivityRules } from '@/components/availability/ActivityRulesFields'
 import {
   hideEventGuideLocally,
   isEventGuideHiddenLocally,
@@ -122,6 +124,16 @@ function toDateInputValue(value: string | null | undefined): string {
   return formatLocalDate(parsed)
 }
 
+function todayDateInput(): string {
+  return formatLocalDate(new Date())
+}
+
+function dateInputAfter(days: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  return formatLocalDate(date)
+}
+
 const emptySlotValues: SlotFormValues = {
   taskId: '',
   date: '',
@@ -155,6 +167,23 @@ export function EventDetailPage() {
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [teamModalOpen, setTeamModalOpen] = useState(false)
   const [availabilitySetOpen, setAvailabilitySetOpen] = useState(false)
+  const [availabilityActivityRules, setAvailabilityActivityRules] = useState<ActivityRules>(() => createDefaultActivityRules())
+  const [shiftRuleDraft, setShiftRuleDraft] = useState<Omit<ShiftRule, 'id' | 'eventId'>>({
+    slotMinutes: 60,
+    minWorkMinutes: 0,
+    maxWorkMinutes: 360,
+    maxContinuousMinutes: 180,
+    breakMinutes: 0,
+    leaderRequiredPerSlot: 0,
+  })
+  const [generationDraft, setGenerationDraft] = useState<Omit<ShiftGenerationSetting, 'id' | 'eventId'>>({
+    preferenceWeight: 50,
+    fairnessWeight: 50,
+    balanceWorkloadWeight: 50,
+    avoidContinuousWorkWeight: 50,
+    leaderAssignmentWeight: 50,
+    requiredPeopleWeight: 50,
+  })
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [latestGenerateResult, setLatestGenerateResult] = useState<ShiftGenerateResult | null>(null)
   const [guideHidden, setGuideHidden] = useState(() => isEventGuideHiddenLocally())
@@ -258,6 +287,30 @@ export function EventDetailPage() {
     () => (Array.isArray(availabilitySetsQuery.data) ? availabilitySetsQuery.data : []),
     [availabilitySetsQuery.data],
   )
+
+  useEffect(() => {
+    if (!shiftSettingsQuery.data) {
+      return
+    }
+
+    setShiftRuleDraft({
+      slotMinutes: shiftSettingsQuery.data.shiftRule.slotMinutes,
+      minWorkMinutes: shiftSettingsQuery.data.shiftRule.minWorkMinutes,
+      maxWorkMinutes: shiftSettingsQuery.data.shiftRule.maxWorkMinutes,
+      maxContinuousMinutes: shiftSettingsQuery.data.shiftRule.maxContinuousMinutes,
+      breakMinutes: shiftSettingsQuery.data.shiftRule.breakMinutes,
+      leaderRequiredPerSlot: shiftSettingsQuery.data.shiftRule.leaderRequiredPerSlot,
+    })
+    setGenerationDraft({
+      preferenceWeight: shiftSettingsQuery.data.generationSetting.preferenceWeight,
+      fairnessWeight: shiftSettingsQuery.data.generationSetting.fairnessWeight,
+      balanceWorkloadWeight: shiftSettingsQuery.data.generationSetting.balanceWorkloadWeight,
+      avoidContinuousWorkWeight: shiftSettingsQuery.data.generationSetting.avoidContinuousWorkWeight,
+      leaderAssignmentWeight: shiftSettingsQuery.data.generationSetting.leaderAssignmentWeight,
+      requiredPeopleWeight: shiftSettingsQuery.data.generationSetting.requiredPeopleWeight,
+    })
+  }, [shiftSettingsQuery.data])
+  const availabilitySetPreview = availabilitySetForm.watch()
   const currentAvailabilitySet = useMemo(
     () => availabilitySets.find((set) => set.id === event?.commonAvailabilitySetId) ?? null,
     [availabilitySets, event?.commonAvailabilitySetId],
@@ -314,18 +367,39 @@ export function EventDetailPage() {
     },
   })
 
+  const assignAvailabilitySetMutation = useMutation({
+    mutationFn: (commonAvailabilitySetId: string | null) =>
+      api.events.update(eventId ?? '', {
+        name: event?.name ?? '',
+        description: event?.description ?? null,
+        location: event?.location ?? null,
+        startDate: toDateInputValue(event?.startDate) || null,
+        endDate: toDateInputValue(event?.endDate) || null,
+        availabilityDeadline: toDateInputValue(event?.availabilityDeadline) || null,
+        commonAvailabilitySetId,
+        status: event?.status ?? 'draft',
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+      await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'availability-sets'] })
+    },
+  })
+
   const createAvailabilitySetMutation = useMutation({
     mutationFn: (values: AvailabilitySetFormValues) =>
-      api.events.createAvailabilitySet(eventId ?? '', {
+      api.groups.createCommonAvailabilitySet(event?.groupId ?? '', {
         name: values.name,
         description: values.description || null,
         startDate: values.startDate,
         endDate: values.endDate,
         deadline: values.deadline || null,
+        activityRules: availabilityActivityRules,
       }),
-    onSuccess: async () => {
+    onSuccess: async (createdSet) => {
+      await assignAvailabilitySetMutation.mutateAsync(createdSet.id)
       await queryClient.invalidateQueries({ queryKey: ['event', eventId] })
       await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'availability-sets'] })
+      await queryClient.invalidateQueries({ queryKey: ['group', event?.groupId, 'common-availability-sets'] })
       setAvailabilitySetOpen(false)
       availabilitySetForm.reset({
         name: '',
@@ -334,6 +408,7 @@ export function EventDetailPage() {
         endDate: '',
         deadline: '',
       })
+      setAvailabilityActivityRules(createDefaultActivityRules())
     },
   })
 
@@ -411,10 +486,16 @@ export function EventDetailPage() {
   })
 
   const generateShiftsMutation = useMutation({
-    mutationFn: () => api.events.generateShifts(eventId ?? ''),
+    mutationFn: async () => {
+      const targetEventId = eventId ?? ''
+      await api.events.updateShiftRule(targetEventId, shiftRuleDraft)
+      await api.events.updateGenerationSettings(targetEventId, generationDraft)
+      return api.events.generateShifts(targetEventId)
+    },
     onSuccess: async (result) => {
       setLatestGenerateResult(result)
       setShiftGenerateOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'shift-settings'] })
       await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'shifts'] })
     },
   })
@@ -711,7 +792,6 @@ export function EventDetailPage() {
     ...(isOwner
       ? [
           { label: 'シフトを作成', onClick: () => setShiftGenerateOpen(true) },
-          { label: 'シフト設定を開く', onClick: () => navigate(`/events/${eventId}/shift-settings`) },
         ]
       : []),
     {
@@ -807,7 +887,7 @@ export function EventDetailPage() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-slate-900 md:text-2xl">{event?.name ?? 'イベント詳細'}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">{event?.description ?? '説明はまだありません。'}</p>
+              {event?.description ? <p className="mt-2 text-sm leading-6 text-slate-500">{event.description}</p> : null}
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[380px]">
@@ -820,12 +900,10 @@ export function EventDetailPage() {
                 <Card className="bg-slate-50">
                   <p className="text-xs font-medium text-slate-500">期間</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{availabilitySets.length}件</p>
-                  <p className="mt-1 text-xs text-slate-500">このイベントで使う参加確認</p>
                 </Card>
                 <Card className="bg-slate-50">
                   <p className="text-xs font-medium text-slate-500">作業</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{tasks.length}件</p>
-                  <p className="mt-1 text-xs text-slate-500">班ページで整理します</p>
                 </Card>
                 <Card className="bg-slate-50">
                   <p className="text-xs font-medium text-slate-500">シフト</p>
@@ -837,12 +915,10 @@ export function EventDetailPage() {
                 <Card className="bg-slate-50">
                   <p className="text-xs font-medium text-slate-500">参加確認</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{availabilitySets.length}件</p>
-                  <p className="mt-1 text-xs text-slate-500">このイベントで使う確認期間です。</p>
                 </Card>
                 <Card className="bg-slate-50">
                   <p className="text-xs font-medium text-slate-500">シフト</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{shifts.length}件</p>
-                  <p className="mt-1 text-xs text-slate-500">公開された内容だけ確認できます。</p>
                 </Card>
               </>
             )}
@@ -1070,7 +1146,7 @@ export function EventDetailPage() {
                                   </Badge>
                                 ) : null}
                               </div>
-                              <p className="mt-1 line-clamp-1 text-sm text-slate-500">{task.description || '説明はまだありません'}</p>
+                              {task.description ? <p className="mt-1 line-clamp-1 text-sm text-slate-500">{task.description}</p> : null}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 sm:justify-end">
@@ -1106,15 +1182,14 @@ export function EventDetailPage() {
         <Card className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">期間設定</h2>
-              <p className="text-sm text-slate-500">このイベントで使う期限を作成し、一覧で確認します。</p>
+              <h2 className="text-lg font-semibold text-slate-900">参加確認</h2>
             </div>
             {canManageGroupWorkspace ? (
               <Button
                 leftIcon={<CalendarPlus className="h-4 w-4" />}
                 onClick={() => setAvailabilitySetOpen(true)}
               >
-                期限を作る
+                期間を作る
               </Button>
             ) : null}
           </div>
@@ -1123,25 +1198,59 @@ export function EventDetailPage() {
             <p className="text-sm text-slate-500">読み込み中...</p>
           ) : (
             <div className="space-y-5">
-              <Card className="space-y-4 bg-slate-50">
+              <Card className="border-slate-200 bg-white">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-400">このイベントで使う期間</p>
+                    <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
+                      {currentAvailabilitySet?.name ?? '未設定'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {currentAvailabilitySet
+                        ? `${currentAvailabilitySet.startDate ?? '未設定'} 〜 ${currentAvailabilitySet.endDate ?? '未設定'}`
+                        : 'グループで作った期間を選びます。'}
+                    </p>
+                  </div>
+                  {currentAvailabilitySet ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => navigate(`/availability-sets/${currentAvailabilitySet.id}`)}
+                      >
+                        入力を見る
+                      </Button>
+                      {canManageGroupWorkspace ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={assignAvailabilitySetMutation.isPending}
+                          onClick={() => assignAvailabilitySetMutation.mutate(null)}
+                        >
+                          解除
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card className="space-y-4 bg-slate-50/70">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900">今作成されている期限</h3>
-                    <p className="text-sm text-slate-500">
-                      ここで作った期限を、イベントの参加確認やシフト作成に使います。
-                    </p>
+                    <h3 className="text-base font-semibold text-slate-900">グループの期間</h3>
                   </div>
                   <Badge variant="brand">{availabilitySets.length}件</Badge>
                 </div>
 
                 {availabilitySets.length ? (
-                  <div className="space-y-2">
+                  <div className="grid gap-2">
                     {availabilitySets.map((set) => {
                       const isCurrent = set.id === currentAvailabilitySet?.id
                       return (
                         <div
                           key={set.id}
-                          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:-translate-y-[1px] hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="min-w-0 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
@@ -1157,7 +1266,17 @@ export function EventDetailPage() {
                             </div>
                             {set.description ? <p className="text-sm leading-6 text-slate-600">{set.description}</p> : null}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {canManageGroupWorkspace ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={isCurrent || assignAvailabilitySetMutation.isPending}
+                                onClick={() => assignAvailabilitySetMutation.mutate(set.id)}
+                              >
+                                {isCurrent ? '設定中' : 'この期間を使う'}
+                              </Button>
+                            ) : null}
                             <Button
                               type="button"
                               variant="secondary"
@@ -1173,13 +1292,16 @@ export function EventDetailPage() {
                   </div>
                 ) : (
                   <EmptyState
-                    title="まだ期限はありません"
-                    description="このイベントの参加確認を始める前に、期限を作成してください。"
-                    actionLabel="期限を作る"
-                    onAction={() => setAvailabilitySetOpen(true)}
+                    title="期間はまだありません"
+                    description="グループに期間を作ると、ここで選べます。"
+                    actionLabel={canManageGroupWorkspace ? '期間を作る' : undefined}
+                    onAction={canManageGroupWorkspace ? () => setAvailabilitySetOpen(true) : undefined}
                   />
                 )}
               </Card>
+              {assignAvailabilitySetMutation.error instanceof Error ? (
+                <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{assignAvailabilitySetMutation.error.message}</p>
+              ) : null}
             </div>
           )}
         </Card>
@@ -1414,25 +1536,77 @@ export function EventDetailPage() {
             班・期間・希望をもとに、シフトの下書きを作成します。先に設定を確認してから進められます。
           </p>
 
-          <section className="grid gap-3 sm:grid-cols-2">
-            <Card className="bg-slate-50">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">基本条件</p>
-              <div className="mt-2 space-y-1 text-sm text-slate-700">
-                <p>枠の長さ: {shiftSettingsQuery.data?.shiftRule.slotMinutes ?? 60}分</p>
-                <p>休憩: {shiftSettingsQuery.data?.shiftRule.breakMinutes ?? 0}分</p>
-                <p>最小勤務: {shiftSettingsQuery.data?.shiftRule.minWorkMinutes ?? 0}分</p>
-                <p>最大勤務: {shiftSettingsQuery.data?.shiftRule.maxWorkMinutes ?? 0}分</p>
-              </div>
-            </Card>
-            <Card className="bg-slate-50">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">重み設定</p>
-              <div className="mt-2 space-y-1 text-sm text-slate-700">
-                <p>希望: {shiftSettingsQuery.data?.generationSetting.preferenceWeight ?? 50}%</p>
-                <p>公平性: {shiftSettingsQuery.data?.generationSetting.fairnessWeight ?? 50}%</p>
-                <p>負荷分散: {shiftSettingsQuery.data?.generationSetting.balanceWorkloadWeight ?? 50}%</p>
-                <p>リーダー: {shiftSettingsQuery.data?.generationSetting.leaderAssignmentWeight ?? 50}%</p>
-              </div>
-            </Card>
+          <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">基本条件</p>
+              <p className="text-xs text-slate-500">作成時だけ調整できます。</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-slate-600">1枠の長さ</span>
+                <Input
+                  type="number"
+                  min={15}
+                  step={15}
+                  value={shiftRuleDraft.slotMinutes}
+                  onChange={(event) => setShiftRuleDraft((current) => ({ ...current, slotMinutes: Number(event.target.value) || 60 }))}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-slate-600">最大勤務</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={30}
+                  value={shiftRuleDraft.maxWorkMinutes}
+                  onChange={(event) => setShiftRuleDraft((current) => ({ ...current, maxWorkMinutes: Number(event.target.value) || 0 }))}
+                />
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs font-medium text-slate-600">休憩</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={shiftRuleDraft.breakMinutes}
+                  onChange={(event) => setShiftRuleDraft((current) => ({ ...current, breakMinutes: Number(event.target.value) || 0 }))}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">優先度</p>
+              <p className="text-xs text-slate-500">迷ったらそのままで大丈夫です。</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['preferenceWeight', '希望を優先'],
+                ['fairnessWeight', '公平性'],
+                ['leaderAssignmentWeight', '班長を優先'],
+                ['requiredPeopleWeight', '不足を減らす'],
+              ].map(([key, label]) => (
+                <label key={key} className="block space-y-1">
+                  <span className="flex items-center justify-between text-xs font-medium text-slate-600">
+                    {label}
+                    <span>{generationDraft[key as keyof typeof generationDraft]}%</span>
+                  </span>
+                  <Input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={generationDraft[key as keyof typeof generationDraft]}
+                    onChange={(event) =>
+                      setGenerationDraft((current) => ({
+                        ...current,
+                        [key]: Number(event.target.value),
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
           </section>
 
           {!event?.commonAvailabilitySetId ? (
@@ -1440,13 +1614,6 @@ export function EventDetailPage() {
               期間は未設定です。先に期間を作ると、希望をもとに作成しやすくなります。
             </p>
           ) : null}
-
-          <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            <p>作成前にシフト設定画面で細かな条件を調整できます。</p>
-            <Button variant="secondary" onClick={() => navigate(`/events/${eventId}/shift-settings`)}>
-              シフト設定を開く
-            </Button>
-          </div>
 
           {generateShiftsMutation.error instanceof Error ? (
             <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{generateShiftsMutation.error.message}</p>
@@ -1733,12 +1900,7 @@ export function EventDetailPage() {
           <Card className="space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">シフト設定</h2>
-              <p className="text-sm text-slate-500">基本条件と最適化設定をまとめて調整できます。</p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button variant="primary" onClick={() => navigate(`/events/${eventId}/shift-settings`)}>
-                シフト設定を開く
-              </Button>
+              <p className="text-sm text-slate-500">シフトを作成するときに、必要な条件を確認できます。</p>
             </div>
           </Card>
 
@@ -1832,19 +1994,41 @@ export function EventDetailPage() {
 
       <Modal title="期間を作る" open={availabilitySetOpen} onClose={() => setAvailabilitySetOpen(false)}>
         <form className="space-y-4" onSubmit={availabilitySetForm.handleSubmit((values) => createAvailabilitySetMutation.mutate(values))}>
-          <p className="text-sm leading-6 text-slate-500">
-            このイベントで参加確認を集める期間を作ります。作った期間は、イベントの参加確認やシフト作成に使います。
-          </p>
+          <PeriodPreview
+            name={availabilitySetPreview.name}
+            startDate={availabilitySetPreview.startDate}
+            endDate={availabilitySetPreview.endDate}
+            deadline={availabilitySetPreview.deadline}
+          />
+
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: '1週間', days: 6 },
+              { label: '2週間', days: 13 },
+              { label: '1か月', days: 29 },
+            ].map((preset) => (
+              <Button
+                key={preset.label}
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  availabilitySetForm.setValue('startDate', todayDateInput(), { shouldValidate: true })
+                  availabilitySetForm.setValue('endDate', dateInputAfter(preset.days), { shouldValidate: true })
+                  if (!availabilitySetForm.getValues('name')) {
+                    availabilitySetForm.setValue('name', `${preset.label}の参加確認`, { shouldValidate: true })
+                  }
+                }}
+              >
+                {preset.label}
+              </Button>
+            ))}
+          </div>
 
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">名前</span>
             <Input {...availabilitySetForm.register('name')} placeholder="夏休み期間の参加確認" />
             {availabilitySetForm.formState.errors.name ? <p className="text-sm text-rose-600">{availabilitySetForm.formState.errors.name.message}</p> : null}
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">説明</span>
-            <Textarea {...availabilitySetForm.register('description')} placeholder="このイベントで一度だけ集める期間です" />
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1864,11 +2048,18 @@ export function EventDetailPage() {
             <DateField {...availabilitySetForm.register('deadline')} />
           </label>
 
+          <label className="block space-y-2">
+            <span className="text-sm font-medium text-slate-700">メモ</span>
+            <Textarea {...availabilitySetForm.register('description')} placeholder="例: 平日は放課後、休日は午前から確認" />
+          </label>
+
+          <ActivityRulesFields value={availabilityActivityRules} onChange={setAvailabilityActivityRules} />
+
           {createAvailabilitySetMutation.error instanceof Error ? (
             <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{createAvailabilitySetMutation.error.message}</p>
           ) : null}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex sm:items-center sm:justify-end sm:px-5">
             <Button type="button" variant="secondary" onClick={() => setAvailabilitySetOpen(false)}>
               キャンセル
             </Button>
