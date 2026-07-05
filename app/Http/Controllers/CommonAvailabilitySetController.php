@@ -9,6 +9,7 @@ use App\Models\Group;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class CommonAvailabilitySetController extends Controller
 {
@@ -90,14 +91,7 @@ class CommonAvailabilitySetController extends Controller
             'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $set = $group->commonAvailabilitySets()->create([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'starts_at' => $validated['startDate'],
-            'ends_at' => $validated['endDate'],
-            'deadline' => $validated['deadline'] ?? null,
-            'activity_rules' => $validated['activityRules'] ?? null,
-        ]);
+        $set = $group->commonAvailabilitySets()->create($this->commonAvailabilityPayload($validated));
 
         return response()->json([
             'success' => true,
@@ -142,15 +136,10 @@ class CommonAvailabilitySetController extends Controller
             'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $set = $event->availabilitySets()->create([
-            'group_id' => $event->group_id,
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'starts_at' => $validated['startDate'],
-            'ends_at' => $validated['endDate'],
-            'deadline' => $validated['deadline'] ?? null,
-            'activity_rules' => $validated['activityRules'] ?? null,
-        ]);
+        $set = $event->availabilitySets()->create(array_merge(
+            ['group_id' => $event->group_id],
+            $this->commonAvailabilityPayload($validated),
+        ));
 
         if (! $event->common_availability_set_id) {
             $event->forceFill([
@@ -190,14 +179,7 @@ class CommonAvailabilitySetController extends Controller
             'activityRules.specialDates.*.note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $set->update([
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'starts_at' => $validated['startDate'],
-            'ends_at' => $validated['endDate'],
-            'deadline' => $validated['deadline'] ?? null,
-            'activity_rules' => $validated['activityRules'] ?? null,
-        ]);
+        $set->update($this->commonAvailabilityPayload($validated));
 
         return response()->json([
             'success' => true,
@@ -230,12 +212,40 @@ class CommonAvailabilitySetController extends Controller
             'startDate' => $set->starts_at?->toDateString(),
             'endDate' => $set->ends_at?->toDateString(),
             'deadline' => $set->deadline?->toIso8601String(),
-            'activityRules' => $set->activity_rules ?? [
+            'activityRules' => $this->hasActivityRulesColumn()
+                ? ($set->activity_rules ?? [
+                    'weekly' => [],
+                    'excludedDates' => [],
+                    'specialDates' => [],
+                ])
+                : [
                 'weekly' => [],
                 'excludedDates' => [],
                 'specialDates' => [],
-            ],
+                ],
             'availabilityCount' => $set->getAttribute('availabilities_count') ?? $set->availabilities()->count(),
         ];
+    }
+
+    private function commonAvailabilityPayload(array $validated): array
+    {
+        $payload = [
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'starts_at' => $validated['startDate'],
+            'ends_at' => $validated['endDate'],
+            'deadline' => $validated['deadline'] ?? null,
+        ];
+
+        if ($this->hasActivityRulesColumn()) {
+            $payload['activity_rules'] = $validated['activityRules'] ?? null;
+        }
+
+        return $payload;
+    }
+
+    private function hasActivityRulesColumn(): bool
+    {
+        return Schema::hasColumn('common_availability_sets', 'activity_rules');
     }
 }

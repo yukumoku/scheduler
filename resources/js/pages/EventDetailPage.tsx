@@ -34,6 +34,7 @@ import { TabBar } from '@/components/ui/TabBar'
 import { canManageEvent, canManageGroup } from '@/lib/permissions'
 import { PeriodPreview } from '@/components/availability/PeriodPreview'
 import { ActivityRulesFields, createDefaultActivityRules } from '@/components/availability/ActivityRulesFields'
+import { AvailabilityReminderList } from '@/components/availability/AvailabilityReminderList'
 import {
   hideEventGuideLocally,
   isEventGuideHiddenLocally,
@@ -223,6 +224,11 @@ export function EventDetailPage() {
     queryKey: ['event', eventId, 'availability-sets'],
     queryFn: () => api.events.availabilitySets(eventId ?? ''),
     enabled: Boolean(eventId),
+  })
+  const ownAvailabilityQuery = useQuery({
+    queryKey: ['event', eventId, 'availability-set', eventQuery.data?.commonAvailabilitySetId, 'me'],
+    queryFn: () => api.commonAvailabilitySets.me(eventQuery.data?.commonAvailabilitySetId ?? ''),
+    enabled: Boolean(eventQuery.data?.commonAvailabilitySetId),
   })
   const shiftSettingsQuery = useQuery({
     queryKey: ['event', eventId, 'shift-settings'],
@@ -815,6 +821,10 @@ export function EventDetailPage() {
       ? [...groupedByTeam, { team: null, tasks: unassigned }]
       : groupedByTeam
   }, [tasks, teams])
+  const hasOwnAvailabilityInput = ownAvailabilityQuery.data?.slots.some(
+    (slot) => slot.availabilityStatus === 'available' || slot.availabilityStatus === 'preferred',
+  ) ?? false
+  const eventPendingAvailabilitySets = currentAvailabilitySet && !hasOwnAvailabilityInput ? [currentAvailabilitySet] : []
 
   return (
     <div className="space-y-4 pb-32 md:pb-0">
@@ -867,6 +877,12 @@ export function EventDetailPage() {
             ) : null}
           </div>
         }
+      />
+
+      <AvailabilityReminderList
+        sets={eventPendingAvailabilitySets}
+        loading={ownAvailabilityQuery.isLoading && Boolean(currentAvailabilitySet)}
+        compact
       />
 
       <Card className="space-y-5">

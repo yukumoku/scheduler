@@ -29,36 +29,45 @@ function getInitials(name?: string | null): string {
 
 export function UserAvatar({ src, name, className, iconClassName }: UserAvatarProps) {
   const [failed, setFailed] = useState(false)
-  const [displaySrc, setDisplaySrc] = useState<string | null>(src ?? null)
 
   useEffect(() => {
     setFailed(false)
-    setDisplaySrc(src ?? null)
   }, [src])
 
   const initials = useMemo(() => getInitials(name), [name])
-  const isExternalSrc = Boolean(displaySrc && /^https?:\/\//i.test(displaySrc))
-  const proxySrc =
-    typeof window !== 'undefined' && displaySrc && /^https?:\/\//i.test(displaySrc)
-      ? `${window.location.origin}/api/avatar-proxy?url=${encodeURIComponent(displaySrc)}`
-      : null
-  const showImage = Boolean(displaySrc) && !failed
+  const imageSrc = useMemo(() => {
+    if (!src) {
+      return null
+    }
+
+    if (typeof window === 'undefined') {
+      return src
+    }
+
+    try {
+      const resolved = new URL(src, window.location.origin)
+      const isSameOrigin = resolved.origin === window.location.origin
+
+      if (isSameOrigin) {
+        return resolved.toString()
+      }
+
+      return `${window.location.origin}/api/avatar-proxy?url=${encodeURIComponent(src)}`
+    } catch {
+      return src
+    }
+  }, [src])
+
+  const showImage = Boolean(imageSrc) && !failed
 
   return (
     <div className={cn('relative inline-flex items-center justify-center overflow-hidden bg-slate-100 text-slate-500', className)}>
       {showImage ? (
         <img
-          src={displaySrc ?? undefined}
+          src={imageSrc ?? undefined}
           alt=""
           className="h-full w-full object-cover"
-          onError={() => {
-            if (proxySrc && displaySrc !== proxySrc) {
-              setDisplaySrc(proxySrc)
-              return
-            }
-
-            setFailed(true)
-          }}
+          onError={() => setFailed(true)}
         />
       ) : initials !== '?' ? (
         <span className="select-none font-semibold text-current">{initials}</span>

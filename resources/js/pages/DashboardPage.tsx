@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { Badge } from '@/components/ui/Badge'
 import { PageGuide } from '@/components/ui/PageGuide'
+import { AvailabilityReminderList } from '@/components/availability/AvailabilityReminderList'
 
 export function DashboardPage() {
   const groupsQuery = useQuery({
@@ -20,9 +21,29 @@ export function DashboardPage() {
     queryFn: () => api.groups.events(primaryGroupId ?? ''),
     enabled: Boolean(primaryGroupId),
   })
+  const availabilitySetsQuery = useQuery({
+    queryKey: ['dashboard', 'availability-sets', groupsQuery.data?.map((group) => group.id).join(',')],
+    queryFn: async () => {
+      const groups = groupsQuery.data ?? []
+      const allSets = await Promise.all(groups.map((group) => api.groups.commonAvailabilitySets(group.id)))
+      const sets = allSets.flat()
+      const ownAvailability = await Promise.all(
+        sets.map(async (set) => {
+          const me = await api.commonAvailabilitySets.me(set.id)
+          const hasInput = me.slots.some((slot) => slot.availabilityStatus === 'available' || slot.availabilityStatus === 'preferred')
+
+          return { set, hasInput }
+        }),
+      )
+
+      return ownAvailability.filter((item) => !item.hasInput).map((item) => item.set)
+    },
+    enabled: Boolean(groupsQuery.data?.length),
+  })
 
   const upcomingEvents = (eventsQuery.data ?? []).filter((event) => event.status !== 'closed').slice(0, 3)
   const draftEvents = (eventsQuery.data ?? []).filter((event) => event.status === 'draft' || event.status === 'collecting')
+  const pendingAvailabilitySets = availabilitySetsQuery.data ?? []
 
   return (
     <div className="space-y-4">
@@ -30,6 +51,8 @@ export function DashboardPage() {
         title="ホーム"
         description="まず見る場所です。グループとイベントの状況をまとめて確認できます。"
       />
+
+      <AvailabilityReminderList sets={pendingAvailabilitySets} loading={availabilitySetsQuery.isLoading && Boolean(groupsQuery.data?.length)} />
 
       <PageGuide
           title="簡単ステップ"

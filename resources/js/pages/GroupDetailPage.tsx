@@ -24,6 +24,7 @@ import { UserAvatar } from '@/components/ui/UserAvatar'
 import { canDeleteGroup, canManageGroup } from '@/lib/permissions'
 import { PeriodPreview } from '@/components/availability/PeriodPreview'
 import { ActivityRulesFields, createDefaultActivityRules } from '@/components/availability/ActivityRulesFields'
+import { AvailabilityReminderList } from '@/components/availability/AvailabilityReminderList'
 import type { ActivityRules } from '@/types/api'
 
 const eventSchema = z.object({
@@ -141,6 +142,23 @@ export function GroupDetailPage() {
     queryKey: ['group', groupId, 'common-availability-sets'],
     queryFn: () => api.groups.commonAvailabilitySets(groupId ?? ''),
     enabled: Boolean(groupId),
+  })
+  const pendingAvailabilitySetsQuery = useQuery({
+    queryKey: ['group', groupId, 'pending-availability-sets'],
+    queryFn: async () => {
+      const sets = commonAvailabilitySetsQuery.data ?? []
+      const ownAvailability = await Promise.all(
+        sets.map(async (set) => {
+          const me = await api.commonAvailabilitySets.me(set.id)
+          const hasInput = me.slots.some((slot) => slot.availabilityStatus === 'available' || slot.availabilityStatus === 'preferred')
+
+          return { set, hasInput }
+        }),
+      )
+
+      return ownAvailability.filter((item) => !item.hasInput).map((item) => item.set)
+    },
+    enabled: Boolean(commonAvailabilitySetsQuery.data?.length),
   })
   const invitationsQuery = useQuery({
     queryKey: ['group', groupId, 'invitations'],
@@ -381,6 +399,12 @@ export function GroupDetailPage() {
         title={group?.name ?? 'グループ詳細'}
         description={group?.description}
         action={headerAction}
+      />
+
+      <AvailabilityReminderList
+        sets={pendingAvailabilitySetsQuery.data ?? []}
+        loading={pendingAvailabilitySetsQuery.isLoading && Boolean(commonAvailabilitySets.length)}
+        compact
       />
 
       <PageGuide
