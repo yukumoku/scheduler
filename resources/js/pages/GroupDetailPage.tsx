@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, CalendarDays, CalendarPlus, Copy, Eye, Mail, Trash2, UserRound, UserRoundCheck, Users } from 'lucide-react'
+import { ArrowRight, CalendarDays, CalendarPlus, Copy, Eye, Mail, Pencil, Trash2, UserRound, UserRoundCheck, Users } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { ActionMenu } from '@/components/ui/ActionMenu'
@@ -25,7 +25,7 @@ import { canDeleteGroup, canManageGroup } from '@/lib/permissions'
 import { PeriodPreview } from '@/components/availability/PeriodPreview'
 import { ActivityRulesFields, createDefaultActivityRules } from '@/components/availability/ActivityRulesFields'
 import { AvailabilityReminderList } from '@/components/availability/AvailabilityReminderList'
-import type { ActivityRules } from '@/types/api'
+import type { ActivityRules, CommonAvailabilitySet } from '@/types/api'
 
 const eventSchema = z.object({
   name: z.string().min(1, 'イベント名を入力してください').max(255),
@@ -94,6 +94,7 @@ export function GroupDetailPage() {
   const [open, setOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [availabilitySetOpen, setAvailabilitySetOpen] = useState(false)
+  const [editingAvailabilitySet, setEditingAvailabilitySet] = useState<CommonAvailabilitySet | null>(null)
   const [availabilityActivityRules, setAvailabilityActivityRules] = useState<ActivityRules>(() => createDefaultActivityRules())
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
   const form = useForm<EventFormValues>({
@@ -248,6 +249,41 @@ export function GroupDetailPage() {
       setActiveTab('availability')
     },
   })
+  const updateCommonAvailabilitySetMutation = useMutation({
+    mutationFn: (values: CommonAvailabilitySetFormValues) => {
+      if (!editingAvailabilitySet) {
+        throw new Error('編集する期間が見つかりません。')
+      }
+
+      return api.commonAvailabilitySets.update(editingAvailabilitySet.id, {
+        name: values.name,
+        description: values.description || null,
+        startDate: values.startDate,
+        endDate: values.endDate,
+        deadline: values.deadline || null,
+        activityRules: availabilityActivityRules,
+      })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['group', groupId, 'common-availability-sets'] })
+      if (editingAvailabilitySet) {
+        await queryClient.invalidateQueries({ queryKey: ['common-availability-set', editingAvailabilitySet.id] })
+        await queryClient.invalidateQueries({ queryKey: ['common-availability-set', editingAvailabilitySet.id, 'me'] })
+        await queryClient.invalidateQueries({ queryKey: ['common-availability-set', editingAvailabilitySet.id, 'submissions'] })
+      }
+      setAvailabilitySetOpen(false)
+      setEditingAvailabilitySet(null)
+      availabilitySetForm.reset({
+        name: '',
+        description: '',
+        startDate: todayDateInput(),
+        endDate: todayDateInput(),
+        deadline: '',
+      })
+      setAvailabilityActivityRules(createDefaultActivityRules())
+      setActiveTab('availability')
+    },
+  })
   const updateMemberRoleMutation = useMutation({
     mutationFn: (input: { memberId: string; role: 'owner' | 'member' }) =>
       api.groups.updateMember(groupId ?? '', input.memberId, { role: input.role }),
@@ -273,6 +309,30 @@ export function GroupDetailPage() {
   const allowGroupManagement = canManageGroup(group)
   const allowGroupDelete = canDeleteGroup(group)
   const ownerCount = members.filter((member) => member.role === 'owner').length
+  const openCreateAvailabilitySet = () => {
+    setEditingAvailabilitySet(null)
+    availabilitySetForm.reset({
+      name: '',
+      description: '',
+      startDate: todayDateInput(),
+      endDate: todayDateInput(),
+      deadline: '',
+    })
+    setAvailabilityActivityRules(createDefaultActivityRules())
+    setAvailabilitySetOpen(true)
+  }
+  const openEditAvailabilitySet = (set: CommonAvailabilitySet) => {
+    setEditingAvailabilitySet(set)
+    availabilitySetForm.reset({
+      name: set.name,
+      description: set.description ?? '',
+      startDate: set.startDate ?? todayDateInput(),
+      endDate: set.endDate ?? todayDateInput(),
+      deadline: set.deadline ? set.deadline.slice(0, 10) : '',
+    })
+    setAvailabilityActivityRules(set.activityRules ?? createDefaultActivityRules())
+    setAvailabilitySetOpen(true)
+  }
   const guideItems = useMemo(() => {
     if (!allowGroupManagement) {
       switch (activeTab) {
@@ -328,6 +388,10 @@ export function GroupDetailPage() {
     activeTab === 'members' && allowGroupManagement ? (
       <Button leftIcon={<Mail className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
         メンバーを招待
+      </Button>
+    ) : activeTab === 'availability' && allowGroupManagement ? (
+      <Button onClick={openCreateAvailabilitySet} leftIcon={<CalendarPlus className="h-4 w-4" />}>
+        期間を作る
       </Button>
     ) : allowGroupManagement ? (
       <Button onClick={() => setOpen(true)} leftIcon={<CalendarPlus className="h-4 w-4" />}>
@@ -735,7 +799,7 @@ export function GroupDetailPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {allowGroupManagement ? (
-                <Button onClick={() => setAvailabilitySetOpen(true)}>
+                <Button onClick={openCreateAvailabilitySet}>
                   新しく作る
                 </Button>
               ) : null}
@@ -750,12 +814,11 @@ export function GroupDetailPage() {
           {commonAvailabilitySets.length ? (
             <div className="grid gap-3">
               {commonAvailabilitySets.map((set) => (
-                <Link
+                <div
                   key={set.id}
-                  to={`/availability-sets/${set.id}`}
                   className="group flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:-translate-y-[1px] hover:border-slate-300 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="min-w-0">
+                  <Link to={`/availability-sets/${set.id}`} className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-semibold text-slate-900">{set.name}</p>
                       <Badge variant="neutral">
@@ -763,12 +826,23 @@ export function GroupDetailPage() {
                       </Badge>
                     </div>
                     {set.description ? <p className="mt-1 text-sm text-slate-500">{set.description}</p> : null}
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2">
                     <Badge variant="brand">{set.availabilityCount}件</Badge>
                     <Badge variant="info">入力</Badge>
+                    {allowGroupManagement ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        leftIcon={<Pencil className="h-4 w-4" />}
+                        onClick={() => openEditAvailabilitySet(set)}
+                      >
+                        編集
+                      </Button>
+                    ) : null}
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           ) : (
@@ -860,10 +934,23 @@ export function GroupDetailPage() {
         </form>
       </Modal>
 
-      <Modal title="期間を作る" open={availabilitySetOpen} onClose={() => setAvailabilitySetOpen(false)}>
+      <Modal
+        title={editingAvailabilitySet ? '期間を編集' : '期間を作る'}
+        open={availabilitySetOpen}
+        onClose={() => {
+          setAvailabilitySetOpen(false)
+          setEditingAvailabilitySet(null)
+        }}
+      >
         <form
           className="space-y-4"
-          onSubmit={availabilitySetForm.handleSubmit((values) => createCommonAvailabilitySetMutation.mutate(values))}
+          onSubmit={availabilitySetForm.handleSubmit((values) => {
+            if (editingAvailabilitySet) {
+              updateCommonAvailabilitySetMutation.mutate(values)
+            } else {
+              createCommonAvailabilitySetMutation.mutate(values)
+            }
+          })}
         >
           <PeriodPreview
             name={availabilitySetPreview.name}
@@ -930,13 +1017,27 @@ export function GroupDetailPage() {
           {createCommonAvailabilitySetMutation.error instanceof Error ? (
             <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{createCommonAvailabilitySetMutation.error.message}</p>
           ) : null}
+          {updateCommonAvailabilitySetMutation.error instanceof Error ? (
+            <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{updateCommonAvailabilitySetMutation.error.message}</p>
+          ) : null}
 
           <div className="sticky bottom-0 -mx-4 grid grid-cols-2 gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex sm:items-center sm:justify-end sm:px-5">
-            <Button type="button" variant="secondary" onClick={() => setAvailabilitySetOpen(false)}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setAvailabilitySetOpen(false)
+                setEditingAvailabilitySet(null)
+              }}
+            >
               キャンセル
             </Button>
-            <Button type="submit" disabled={createCommonAvailabilitySetMutation.isPending}>
-              {createCommonAvailabilitySetMutation.isPending ? '作成中...' : '期間を作る'}
+            <Button type="submit" disabled={createCommonAvailabilitySetMutation.isPending || updateCommonAvailabilitySetMutation.isPending}>
+              {createCommonAvailabilitySetMutation.isPending || updateCommonAvailabilitySetMutation.isPending
+                ? '保存中...'
+                : editingAvailabilitySet
+                  ? '保存'
+                  : '期間を作る'}
             </Button>
           </div>
         </form>

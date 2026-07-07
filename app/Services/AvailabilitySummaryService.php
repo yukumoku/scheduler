@@ -188,18 +188,43 @@ class AvailabilitySummaryService
     {
         $start = Carbon::parse($set->starts_at ?? now());
         $end = Carbon::parse($set->ends_at ?? now());
+        $rules = is_array($set->activity_rules) ? $set->activity_rules : [];
+        $weekly = is_array($rules['weekly'] ?? null) ? $rules['weekly'] : [];
+        $excludedDates = collect($rules['excludedDates'] ?? [])
+            ->filter(fn ($date) => is_string($date) && $date !== '')
+            ->map(fn (string $date) => Carbon::parse($date)->toDateString())
+            ->all();
+        $specialDates = collect($rules['specialDates'] ?? [])
+            ->filter(fn ($item) => is_array($item) && ! empty($item['date']) && ! empty($item['startTime']) && ! empty($item['endTime']))
+            ->keyBy(fn (array $item) => Carbon::parse($item['date'])->toDateString());
         $slots = collect();
 
         for ($date = $start->copy(); $date->lessThanOrEqualTo($end); $date->addDay()) {
+            $dateString = $date->toDateString();
+
+            if (in_array($dateString, $excludedDates, true)) {
+                continue;
+            }
+
+            $specialDate = $specialDates->get($dateString);
+            $weekdayRule = $weekly[strtolower($date->format('D'))] ?? null;
+            $startTime = $specialDate['startTime'] ?? ($weekdayRule['startTime'] ?? '09:00');
+            $endTime = $specialDate['endTime'] ?? ($weekdayRule['endTime'] ?? '12:00');
+            $enabled = $specialDate !== null || (bool) ($weekdayRule['enabled'] ?? true);
+
+            if (! $enabled || $this->normalizeTime($startTime) >= $this->normalizeTime($endTime)) {
+                continue;
+            }
+
             $slots->push([
                 'commonAvailabilitySetId' => $set->id,
                 'userId' => null,
-                'date' => $date->toDateString(),
-                'startTime' => '09:00',
-                'endTime' => '12:00',
+                'date' => $dateString,
+                'startTime' => $this->normalizeTime($startTime),
+                'endTime' => $this->normalizeTime($endTime),
                 'requiredPeople' => 1,
                 'location' => null,
-                'note' => null,
+                'note' => $specialDate['note'] ?? null,
                 'isCustom' => false,
             ]);
         }

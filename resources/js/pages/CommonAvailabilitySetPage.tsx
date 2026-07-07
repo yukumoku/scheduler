@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Modal } from '@/components/ui/Modal'
 import { Textarea } from '@/components/ui/Textarea'
+import type { ActivityRules } from '@/types/api'
 
 type AvailabilityDraft = {
   date: string
@@ -42,6 +43,70 @@ function shiftMonthKey(value: string, offset: number): string {
   const month = Number(monthPart)
   const next = new Date(year, month - 1 + offset, 1)
   return `${next.getFullYear()}-${`${next.getMonth() + 1}`.padStart(2, '0')}`
+}
+
+const weekdayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+
+function parseLocalDate(value: string): Date {
+  return new Date(`${value}T00:00:00`)
+}
+
+function getActivityWindow(date: string, rules?: ActivityRules | null): { startTime: string; endTime: string; note?: string | null } | null {
+  const normalizedRules = rules ?? { weekly: {}, excludedDates: [], specialDates: [] }
+
+  if (normalizedRules.excludedDates?.includes(date)) {
+    return null
+  }
+
+  const specialDate = normalizedRules.specialDates?.find((item) => item.date === date)
+  if (specialDate?.startTime && specialDate.endTime && specialDate.startTime < specialDate.endTime) {
+    return {
+      startTime: specialDate.startTime,
+      endTime: specialDate.endTime,
+      note: specialDate.note,
+    }
+  }
+
+  const weekday = weekdayKeys[parseLocalDate(date).getDay()]
+  const weekly = normalizedRules.weekly?.[weekday]
+  if (!weekly) {
+    return {
+      startTime: '09:00',
+      endTime: '12:00',
+    }
+  }
+
+  if (weekly.enabled === false || !weekly.startTime || !weekly.endTime || weekly.startTime >= weekly.endTime) {
+    return null
+  }
+
+  return {
+    startTime: weekly.startTime,
+    endTime: weekly.endTime,
+  }
+}
+
+function getMonthCells(monthKey: string): string[] {
+  if (!monthKey) {
+    return []
+  }
+
+  const [yearPart, monthPart] = monthKey.split('-')
+  const year = Number(yearPart)
+  const monthIndex = Number(monthPart) - 1
+  const firstDay = new Date(year, monthIndex, 1)
+  const lastDay = new Date(year, monthIndex + 1, 0)
+  const cells: string[] = []
+
+  for (let index = 0; index < firstDay.getDay(); index += 1) {
+    cells.push('')
+  }
+
+  for (let day = 1; day <= lastDay.getDate(); day += 1) {
+    cells.push(formatLocalDate(new Date(year, monthIndex, day)))
+  }
+
+  return cells
 }
 
 export function CommonAvailabilitySetPage() {
@@ -127,8 +192,8 @@ export function CommonAvailabilitySetPage() {
       return []
     }
 
-    const start = new Date(`${setData.startDate}T00:00:00`)
-    const end = new Date(`${setData.endDate}T00:00:00`)
+    const start = parseLocalDate(setData.startDate)
+    const end = parseLocalDate(setData.endDate)
     const dates: string[] = []
 
     for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
@@ -138,10 +203,8 @@ export function CommonAvailabilitySetPage() {
     return dates
   }, [setData?.endDate, setData?.startDate])
   const activeMonthCursor = monthCursor || periodDates[0]?.slice(0, 7) || ''
-  const activeMonthDates = useMemo(
-    () => periodDates.filter((date) => date.startsWith(activeMonthCursor)),
-    [activeMonthCursor, periodDates],
-  )
+  const periodDateSet = useMemo(() => new Set(periodDates), [periodDates])
+  const activeMonthCells = useMemo(() => getMonthCells(activeMonthCursor), [activeMonthCursor])
   const savedDrafts = useMemo(
     () =>
       Object.values(drafts).sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)),
@@ -161,6 +224,11 @@ export function CommonAvailabilitySetPage() {
   }
 
   const openDateModal = (date: string) => {
+    const activityWindow = getActivityWindow(date, setData?.activityRules)
+    if (!activityWindow) {
+      return
+    }
+
     const existingDrafts = Object.values(drafts)
       .filter((draft) => draft.date === date)
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -178,8 +246,8 @@ export function CommonAvailabilitySetPage() {
         : [
             {
               date,
-              startTime: '09:00',
-              endTime: '12:00',
+              startTime: activityWindow.startTime,
+              endTime: activityWindow.endTime,
               status: 'available',
               comment: '',
             },
@@ -194,12 +262,15 @@ export function CommonAvailabilitySetPage() {
 
   const saveDateModal = () => {
     if (!modalDate) return
+    const activityWindow = getActivityWindow(modalDate, setData?.activityRules)
+    if (!activityWindow) return
 
     setDrafts((current) => {
       const next = Object.fromEntries(Object.entries(current).filter(([, value]) => value.date !== modalDate))
 
       for (const draft of modalDrafts) {
         if (!draft.startTime || !draft.endTime || draft.startTime >= draft.endTime) continue
+        if (draft.startTime < activityWindow.startTime || draft.endTime > activityWindow.endTime) continue
         const key = `${modalDate}|${draft.startTime}|${draft.endTime}`
         next[key] = {
           date: modalDate,
@@ -222,12 +293,15 @@ export function CommonAvailabilitySetPage() {
 
   const addModalDraft = () => {
     if (!modalDate) return
+    const activityWindow = getActivityWindow(modalDate, setData?.activityRules)
+    if (!activityWindow) return
+
     setModalDrafts((current) => [
       ...current,
       {
         date: modalDate,
-        startTime: '09:00',
-        endTime: '12:00',
+        startTime: activityWindow.startTime,
+        endTime: activityWindow.endTime,
         status: 'available',
         comment: '',
       },
@@ -376,11 +450,15 @@ export function CommonAvailabilitySetPage() {
                 </div>
 
                 <div className="grid grid-cols-7 gap-1.5 rounded-3xl bg-slate-50 p-2 sm:gap-2">
-                  {Array.from({ length: activeMonthCursor ? new Date(`${activeMonthCursor}-01T00:00:00`).getDay() : 0 }).map((_, index) => (
-                    <div key={`blank-${index}`} className="aspect-square rounded-xl sm:rounded-2xl" />
-                  ))}
-                  {activeMonthDates.map((date) => {
-                      const weekdayLabel = new Intl.DateTimeFormat('ja-JP', { weekday: 'short' }).format(new Date(`${date}T00:00:00`))
+                  {activeMonthCells.map((date, index) => {
+                      if (!date) {
+                        return <div key={`blank-${index}`} className="aspect-square rounded-xl sm:rounded-2xl" />
+                      }
+
+                      const activityWindow = getActivityWindow(date, setData?.activityRules)
+                      const isInPeriod = periodDateSet.has(date)
+                      const isActive = isInPeriod && Boolean(activityWindow)
+                      const weekdayLabel = new Intl.DateTimeFormat('ja-JP', { weekday: 'short' }).format(parseLocalDate(date))
                       const dayEntries = Object.values(drafts).filter((draft) => draft.date === date)
                       const hasEntries = dayEntries.length > 0
                       return (
@@ -388,11 +466,16 @@ export function CommonAvailabilitySetPage() {
                           key={date}
                           type="button"
                           onClick={() => openDateModal(date)}
+                          disabled={!isActive}
                           className={[
                             'flex aspect-square flex-col justify-between rounded-xl border p-1.5 text-left transition sm:rounded-2xl sm:p-2',
                             hasEntries
                               ? 'border-slate-950 bg-slate-950 text-white shadow-sm'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                              : isActive
+                                ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                : isInPeriod
+                                  ? 'border-slate-100 bg-slate-100/70 text-slate-300'
+                                  : 'border-transparent bg-transparent text-slate-200',
                           ].join(' ')}
                         >
                           <div className="flex items-center justify-between">
@@ -401,10 +484,10 @@ export function CommonAvailabilitySetPage() {
                           </div>
                           <div className="flex items-center justify-between">
                             <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-white/70' : 'text-slate-400'].join(' ')}>
-                              {hasEntries ? '入力済み' : '未入力'}
+                              {hasEntries ? '入力済み' : isActive ? '未入力' : isInPeriod ? '休み' : ''}
                             </span>
-                            <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', hasEntries ? 'bg-white text-slate-950' : 'bg-slate-100 text-slate-500'].join(' ')}>
-                              {hasEntries ? `${dayEntries.length}` : '＋'}
+                            <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', hasEntries ? 'bg-white text-slate-950' : isActive ? 'bg-slate-100 text-slate-500' : 'bg-transparent text-slate-300'].join(' ')}>
+                              {hasEntries ? `${dayEntries.length}` : isActive ? '＋' : ''}
                             </span>
                           </div>
                         </button>
@@ -565,6 +648,11 @@ export function CommonAvailabilitySetPage() {
         onClose={closeDateModal}
       >
         <div className="space-y-4">
+          {modalDate && getActivityWindow(modalDate, setData?.activityRules) ? (
+            <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              入力できる時間: {getActivityWindow(modalDate, setData?.activityRules)?.startTime} - {getActivityWindow(modalDate, setData?.activityRules)?.endTime}
+            </p>
+          ) : null}
           <div className="space-y-3">
             {modalDrafts.map((draft, index) => (
               <div key={`${index}-${draft.startTime}-${draft.endTime}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -574,6 +662,8 @@ export function CommonAvailabilitySetPage() {
                     <Input
                       type="time"
                       step={300}
+                      min={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.startTime : undefined}
+                      max={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.endTime : undefined}
                       value={draft.startTime}
                       onChange={(event) => updateModalDraft(index, { startTime: event.target.value })}
                     />
@@ -583,6 +673,8 @@ export function CommonAvailabilitySetPage() {
                     <Input
                       type="time"
                       step={300}
+                      min={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.startTime : undefined}
+                      max={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.endTime : undefined}
                       value={draft.endTime}
                       onChange={(event) => updateModalDraft(index, { endTime: event.target.value })}
                     />
