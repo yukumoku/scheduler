@@ -166,7 +166,7 @@ export function AppLayout() {
             />
             <div className="min-w-0">
               <p className="truncate font-semibold text-slate-900">{meQuery.data?.displayName ?? '未ログイン'}</p>
-              <p className="truncate text-sm text-slate-500">{meQuery.data?.email ?? 'アカウント情報を取得中'}</p>
+              <p className="truncate text-sm text-slate-500">{meQuery.data ? 'アカウント設定' : 'アカウント情報を取得中'}</p>
             </div>
           </div>
           {meQuery.data ? (

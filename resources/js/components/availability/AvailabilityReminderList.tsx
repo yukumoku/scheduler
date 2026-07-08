@@ -31,7 +31,7 @@ export function AvailabilityReminderList({ sets, loading = false, compact = fals
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-amber-950">参加確認を入力してください</p>
-          {!compact ? <p className="mt-1 text-sm text-amber-800">未入力の期間があります。押すと入力画面へ移動します。</p> : null}
+          {!compact ? <p className="mt-1 text-sm text-amber-800">未入力の参加確認があります。押すと入力画面へ移動します。</p> : null}
         </div>
         <Badge variant="warning">{sets.length}件</Badge>
       </div>

@@ -481,7 +481,7 @@ export function TeamDetailPage() {
         </Card>
         <Card className="bg-slate-50">
           <p className="text-sm text-slate-500">リーダー</p>
-          <p className="mt-2 text-base font-semibold text-slate-900">{team?.leader?.displayName ?? team?.leader?.email ?? '未設定'}</p>
+          <p className="mt-2 text-base font-semibold text-slate-900">{team?.leader?.displayName ?? '未設定'}</p>
         </Card>
         <Card className="bg-slate-50">
           <p className="text-sm text-slate-500">作業</p>
@@ -496,7 +496,7 @@ export function TeamDetailPage() {
             <Settings2 className="h-5 w-5 text-violet-600" />
             <div>
               <h2 className="text-lg font-semibold text-slate-900">この班の作業</h2>
-              <p className="text-sm text-slate-500">作業はこの班のページで作成・編集します。期間や日時は作業の下に並びます。</p>
+              <p className="text-sm text-slate-500">作業はこの班のページで作成・編集します。参加確認や日時は作業の下に並びます。</p>
             </div>
           </div>
           {canAddTask && teamQuery.data?.eventId && !isDefaultTeam ? (
@@ -520,7 +520,7 @@ export function TeamDetailPage() {
               <div className="hidden grid-cols-[1.6fr_0.8fr_0.8fr_auto] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-3 text-xs font-medium uppercase tracking-wide text-slate-500 sm:grid">
                 <span>名前</span>
                 <span>状態</span>
-                <span>期間</span>
+                <span>参加確認</span>
                 <span className="text-right">操作</span>
               </div>
               {teamTasks.map((task) => (
@@ -549,7 +549,7 @@ export function TeamDetailPage() {
                               const member = groupMembers.find((item) => item.userId === memberId)
                               return (
                                 <Badge key={memberId} variant="warning">
-                                  {member?.displayName ?? member?.email ?? '必須メンバー'}
+                                  {member?.displayName ?? '必須メンバー'}
                                 </Badge>
                               )
                             })}
@@ -612,7 +612,7 @@ export function TeamDetailPage() {
           ) : (
             <EmptyState
               title="この班の作業はまだありません"
-              description="班のページから作業を追加すると、期間と必要時間を先に整理しやすくなります。"
+              description="班のページから作業を追加すると、参加確認と必要時間を先に整理しやすくなります。"
               actionLabel={canAddTask && !isDefaultTeam ? '作業を追加' : '班の説明を見る'}
               onAction={
                 canAddTask && !isDefaultTeam
@@ -643,7 +643,7 @@ export function TeamDetailPage() {
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-slate-600">
-            メールアドレスは通常表示せず、操作はメニューにまとめています。
+            操作はメニューにまとめています。
             {isDefaultTeam ? ' 全体班は自動同期されるため、メンバーの追加・削除はできません。' : ''}
           </p>
           {canManage && !isDefaultTeam ? (
@@ -659,7 +659,7 @@ export function TeamDetailPage() {
               <div key={member.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-5">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-sm font-semibold text-violet-700">
-                    {(member.displayName ?? member.email ?? '?').slice(0, 1)}
+                    {(member.displayName ?? '?').slice(0, 1)}
                   </div>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -758,7 +758,7 @@ export function TeamDetailPage() {
               <option value="">選択してください</option>
               {memberOptions.map((groupMember) => (
                 <option key={groupMember.id} value={groupMember.userId}>
-                  {groupMember.displayName ?? groupMember.email ?? '名前未設定'}
+                  {groupMember.displayName ?? '名前未設定'}
                 </option>
               ))}
             </Select>
@@ -820,9 +820,9 @@ export function TeamDetailPage() {
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-700">イベントの期間</p>
+                <p className="text-sm font-medium text-slate-700">イベントの参加確認</p>
                 <p className="text-xs leading-6 text-slate-500">
-                  作業の日付は、イベントで作った期間を選んで使えます。未選択なら、期間なしの作業として保存できます。
+                  作業の日付は、イベントで作った参加確認を選んで使えます。未選択でも保存できます。
                 </p>
               </div>
               {teamQuery.data?.eventId ? (
@@ -832,7 +832,7 @@ export function TeamDetailPage() {
                   variant="secondary"
                   onClick={() => navigate(`/events/${teamQuery.data.eventId}?open=availability-set`)}
                 >
-                  期間を作る
+                  参加確認を作る
                 </Button>
               ) : null}
             </div>
@@ -848,7 +848,7 @@ export function TeamDetailPage() {
                 }
               }}
             >
-              <option value="">期間を選ばない</option>
+              <option value="">参加確認を選ばない</option>
               {availabilitySets.map((set) => (
                 <option key={set.id} value={set.id}>
                   {set.name} {set.startDate ?? '未設定'} 〜 {set.endDate ?? '未設定'}
@@ -861,7 +861,7 @@ export function TeamDetailPage() {
                 {selectedWorkPeriod ? `（${selectedWorkPeriod.startDate ?? '未設定'} 〜 ${selectedWorkPeriod.endDate ?? '未設定'}）` : ''}
               </p>
             ) : (
-              <p className="text-xs leading-6 text-slate-500">先にイベントで期間を作ると、ここで選べます。</p>
+              <p className="text-xs leading-6 text-slate-500">先にイベントで参加確認を作ると、ここで選べます。</p>
             )}
           </div>
 
@@ -876,7 +876,7 @@ export function TeamDetailPage() {
               <div className="flex flex-wrap gap-2">
                 {taskRequiredMembers.map((member) => (
                   <Badge key={member.userId} variant="warning">
-                    {member.displayName ?? member.email ?? '名前未設定'}
+                    {member.displayName ?? '名前未設定'}
                   </Badge>
                 ))}
               </div>
@@ -938,7 +938,7 @@ export function TeamDetailPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-slate-700">日時の候補</p>
-                <p className="text-xs text-slate-500">買い出しなど、日時が決まっている作業だけ入れます。期間で調整できる作業は空でもかまいません。</p>
+                <p className="text-xs text-slate-500">買い出しなど、日時が決まっている作業だけ入れます。参加確認で調整できる作業は空でもかまいません。</p>
               </div>
               <Button
                 type="button"

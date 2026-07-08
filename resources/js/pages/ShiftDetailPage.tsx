@@ -161,7 +161,6 @@ export function ShiftDetailPage() {
             task: group.taskName,
             team: group.teamName ?? '',
             member: '',
-            email: '',
             role: '',
             requiredPeople: group.requiredPeople,
           },
@@ -173,8 +172,7 @@ export function ShiftDetailPage() {
         time: `${group.startTime?.slice(0, 5) ?? ''}-${group.endTime?.slice(0, 5) ?? ''}`,
         task: group.taskName,
         team: group.teamName ?? '',
-        member: assignment.user?.displayName ?? assignment.user?.email ?? '',
-        email: assignment.user?.email ?? '',
+        member: assignment.user?.displayName ?? '名前未設定',
         role: assignment.isLeader ? 'リーダー' : 'メンバー',
         requiredPeople: group.requiredPeople,
       }))
@@ -182,11 +180,11 @@ export function ShiftDetailPage() {
   }, [groupedAssignments])
 
   const downloadCsv = () => {
-    const headers = ['日付', '時間', '作業', '班', 'メンバー', 'メール', '役割', '必要人数']
+    const headers = ['日付', '時間', '作業', '班', 'メンバー', '役割', '必要人数']
     const csv = [
       headers.map(escapeCsvValue).join(','),
       ...exportRows.map((row) =>
-        [row.date, row.time, row.task, row.team, row.member, row.email, row.role, row.requiredPeople].map(escapeCsvValue).join(','),
+        [row.date, row.time, row.task, row.team, row.member, row.role, row.requiredPeople].map(escapeCsvValue).join(','),
       ),
     ].join('\n')
 
@@ -220,7 +218,7 @@ export function ShiftDetailPage() {
           .filter((group) => (group.date ?? '未設定') === date && `${group.startTime?.slice(0, 5) ?? ''}-${group.endTime?.slice(0, 5) ?? ''}` === time)
           .map((group) => {
             const members = group.assignments
-              .map((assignment) => assignment.user?.displayName ?? assignment.user?.email ?? '未設定')
+              .map((assignment) => assignment.user?.displayName ?? '名前未設定')
               .join(' / ')
             const progress = `${group.assignments.length}/${group.requiredPeople}人`
 
@@ -247,7 +245,6 @@ export function ShiftDetailPage() {
         作業: row.task,
         班: row.team,
         メンバー: row.member,
-        メール: row.email,
         役割: row.role,
         必要人数: row.requiredPeople,
       })),
@@ -258,10 +255,9 @@ export function ShiftDetailPage() {
       { wch: 24 },
       { wch: 18 },
       { wch: 20 },
-      { wch: 28 },
       { wch: 12 },
       { wch: 10 },
-    ], `A1:H${Math.max(exportRows.length + 1, 1)}`)
+    ], `A1:G${Math.max(exportRows.length + 1, 1)}`)
     XLSX.utils.book_append_sheet(workbook, detailSheet, '一覧')
 
     const rowsByDate = exportRows.reduce<Record<string, typeof exportRows>>((groups, row) => {
@@ -280,7 +276,6 @@ export function ShiftDetailPage() {
           作業: row.task,
           班: row.team,
           メンバー: row.member,
-          メール: row.email,
           役割: row.role,
           必要人数: row.requiredPeople,
         })),
@@ -290,10 +285,9 @@ export function ShiftDetailPage() {
         { wch: 24 },
         { wch: 18 },
         { wch: 20 },
-        { wch: 28 },
         { wch: 12 },
         { wch: 10 },
-      ], `A1:G${Math.max(rows.length + 1, 1)}`)
+      ], `A1:F${Math.max(rows.length + 1, 1)}`)
       XLSX.utils.book_append_sheet(workbook, sheet, date.slice(0, 31))
     })
 
@@ -495,9 +489,9 @@ export function ShiftDetailPage() {
                                       className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
                                     >
                                       <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-[10px] text-slate-600">
-                                        {(assignment.user?.displayName ?? assignment.user?.email ?? '?').slice(0, 1)}
+        {(assignment.user?.displayName ?? '?').slice(0, 1)}
                                       </span>
-                                      {assignment.user?.displayName ?? assignment.user?.email ?? '未設定'}
+                                      {assignment.user?.displayName ?? '名前未設定'}
                                       {assignment.isLeader ? <span className="text-violet-600">班長</span> : null}
                                     </span>
                                   ))}

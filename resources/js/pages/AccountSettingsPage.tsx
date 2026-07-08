@@ -82,7 +82,7 @@ export function AccountSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="アカウント設定" description="表示名とアイコンを変更できます。メールアドレスはログインに使うため変更できません。" />
+      <PageHeader title="アカウント設定" description="表示名とアイコンを変更できます。" />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
         <Card>
@@ -143,12 +143,12 @@ export function AccountSettingsPage() {
             />
             <div className="min-w-0">
               <p className="truncate font-semibold text-slate-900">{meQuery.data?.displayName ?? '読み込み中'}</p>
-              <p className="truncate text-sm text-slate-500">{meQuery.data?.email ?? ''}</p>
+              <p className="truncate text-sm text-slate-500">プロフィール</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Badge variant="brand">{meQuery.data?.provider ?? 'ログイン'}</Badge>
-            <Badge variant="neutral">メールは変更不可</Badge>
+            <Badge variant="neutral">プロフィール</Badge>
           </div>
           <p className="text-sm leading-6 text-slate-600">ここで変更した表示名は、グループやシフトのメンバー表示に使われます。</p>
         </Card>

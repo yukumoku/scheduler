@@ -51,7 +51,7 @@ export function PeriodPreview({ name, startDate, endDate, deadline }: PeriodPrev
                 <CalendarDays className="h-4 w-4" />
               </span>
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-slate-950">{name?.trim() || '新しい期間'}</p>
+                <p className="truncate text-base font-semibold text-slate-950">{name?.trim() || '新しい参加確認'}</p>
                 <p className="text-xs text-slate-500">この範囲で参加できる時間を集めます</p>
               </div>
             </div>

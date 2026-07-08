@@ -39,15 +39,10 @@ const eventSchema = z.object({
   path: ['endDate'],
 })
 
-const invitationSchema = z.object({
-  email: z.string().max(255).optional().transform((value) => value?.trim() || ''),
-}).refine((value) => !value.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.email), {
-  message: 'メールアドレスの形式で入力してください',
-  path: ['email'],
-})
+const invitationSchema = z.object({})
 
 const commonAvailabilitySetSchema = z.object({
-  name: z.string().min(1, '期間名を入力してください').max(255),
+  name: z.string().min(1, '参加確認名を入力してください').max(255),
   description: z.string().max(1000).optional().transform((value) => value?.trim() || ''),
   startDate: z.string().min(1, '開始日を入力してください'),
   endDate: z.string().min(1, '終了日を入力してください'),
@@ -110,9 +105,7 @@ export function GroupDetailPage() {
   })
   const inviteForm = useForm<InvitationFormValues>({
     resolver: zodResolver(invitationSchema),
-    defaultValues: {
-      email: '',
-    },
+    defaultValues: {},
   })
   const availabilitySetForm = useForm<CommonAvailabilitySetFormValues>({
     resolver: zodResolver(commonAvailabilitySetSchema),
@@ -205,15 +198,15 @@ export function GroupDetailPage() {
     },
   })
   const createInvitationMutation = useMutation({
-    mutationFn: (values: InvitationFormValues) =>
+    mutationFn: () =>
       api.groups.createInvitation(groupId ?? '', {
-        email: values.email || null,
+        email: null,
       }),
     onSuccess: async (invitation) => {
       await queryClient.invalidateQueries({ queryKey: ['group', groupId, 'invitations'] })
       setInviteOpen(false)
       setCopiedInvitationId(invitation.id)
-      inviteForm.reset({ email: '' })
+      inviteForm.reset({})
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(invitation.code ?? invitation.inviteUrl).catch(() => undefined)
       }
@@ -252,7 +245,7 @@ export function GroupDetailPage() {
   const updateCommonAvailabilitySetMutation = useMutation({
     mutationFn: (values: CommonAvailabilitySetFormValues) => {
       if (!editingAvailabilitySet) {
-        throw new Error('編集する期間が見つかりません。')
+        throw new Error('編集する参加確認が見つかりません。')
       }
 
       return api.commonAvailabilitySets.update(editingAvailabilitySet.id, {
@@ -367,13 +360,13 @@ export function GroupDetailPage() {
       case 'events':
         return [
           { title: 'イベントを作る', description: '必要な活動だけを登録します。' },
-          { title: '期間はイベントで管理', description: '参加確認はイベント側にまとめます。' },
+          { title: '参加確認を見る', description: '必要な入力だけ確認します。' },
           { title: '詳細を開く', description: '作業やシフトへ進みます。' },
         ]
       case 'availability':
         return [
-          { title: '期間を作る', description: 'イベントで使う確認期間を先に作ります。' },
-          { title: '日付を選ぶ', description: '期間内の日だけ入力できます。' },
+          { title: '参加確認を作る', description: 'メンバーに行ける日を聞きます。' },
+          { title: '日付を選ぶ', description: '確認する日の中から入力できます。' },
           { title: '時間を複数入れる', description: '同じ日に何件でも追加できます。' },
         ]
       default:
@@ -391,7 +384,7 @@ export function GroupDetailPage() {
       </Button>
     ) : activeTab === 'availability' && allowGroupManagement ? (
       <Button onClick={openCreateAvailabilitySet} leftIcon={<CalendarPlus className="h-4 w-4" />}>
-        期間を作る
+        参加確認を作る
       </Button>
     ) : allowGroupManagement ? (
       <Button onClick={() => setOpen(true)} leftIcon={<CalendarPlus className="h-4 w-4" />}>
@@ -484,7 +477,7 @@ export function GroupDetailPage() {
           { key: 'overview', label: '概要' },
           { key: 'members', label: 'メンバー', count: members.length },
           { key: 'events', label: 'イベント', count: events.length },
-          { key: 'availability', label: '期間', count: commonAvailabilitySets.length },
+          { key: 'availability', label: '参加確認', count: commonAvailabilitySets.length },
         ]}
       />
 
@@ -493,26 +486,26 @@ export function GroupDetailPage() {
           <Card className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">イベント</h2>
+                <h2 className="text-lg font-semibold text-slate-900">すぐ使う</h2>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={() => setActiveTab('availability')}>
-                  参加可能日時を見る
+                  参加確認
                 </Button>
                 {commonAvailabilitySets[0] ? (
                   <Button variant="secondary" onClick={() => navigate(`/availability-sets/${commonAvailabilitySets[0].id}`)}>
-                    いま入力する
+                    入力する
                   </Button>
                 ) : null}
                 <Button variant="secondary" onClick={() => setActiveTab('events')}>
-                  イベントを見る
+                  イベント
                 </Button>
                 {allowGroupManagement ? <Button onClick={() => setOpen(true)}>イベントを作る</Button> : null}
               </div>
             </div>
             <EmptyState
-              title="イベント"
-              description="必要な活動を、ここから開きます。"
+              title="迷ったらここから"
+              description="参加確認、イベント、メンバーへ直接進めます。"
               actionLabel={allowGroupManagement ? 'イベントを作る' : 'イベントを見る'}
               onAction={allowGroupManagement ? () => setOpen(true) : () => setActiveTab('events')}
             />
@@ -629,7 +622,7 @@ export function GroupDetailPage() {
                   <div key={invitation.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-900">{invitation.email || '共有用コード'}</p>
+                        <p className="truncate font-semibold text-slate-900">共有用コード</p>
                         <p className="mt-1 text-sm text-slate-500">
                           期限 {invitation.expiresAt ? new Date(invitation.expiresAt).toLocaleDateString('ja-JP') : 'なし'}
                         </p>
@@ -847,7 +840,7 @@ export function GroupDetailPage() {
             </div>
           ) : (
             <EmptyState
-              title="期間はまだありません"
+              title="参加確認はまだありません"
               description="オーナーが作成すると、ここから入力できます。"
             />
           )}
@@ -855,16 +848,12 @@ export function GroupDetailPage() {
       ) : null}
 
       <Modal title="メンバーを招待" open={inviteOpen} onClose={() => setInviteOpen(false)}>
-        <form className="space-y-4" onSubmit={inviteForm.handleSubmit((values) => createInvitationMutation.mutate(values))}>
+        <form className="space-y-4" onSubmit={inviteForm.handleSubmit(() => createInvitationMutation.mutate())}>
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <p className="text-sm font-semibold text-slate-900">招待コードを作成</p>
           </div>
 
-          <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">メールアドレス</span>
-            <Input type="email" {...inviteForm.register('email')} placeholder="任意: member@example.com" />
-            {inviteForm.formState.errors.email ? <p className="text-sm text-rose-600">{inviteForm.formState.errors.email.message}</p> : null}
-          </label>
+          <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">コードを共有すると、メンバーは自分で参加できます。</p>
 
           {createInvitationErrorMessage ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{createInvitationErrorMessage}</p> : null}
 
@@ -881,7 +870,7 @@ export function GroupDetailPage() {
 
       <Modal title="イベントを作成" open={open} onClose={() => setOpen(false)}>
         <form className="space-y-4" onSubmit={form.handleSubmit((values) => createEventMutation.mutate(values))}>
-          <p className="text-sm leading-6 text-slate-500">イベント名と日付を入れて作成します。確認期間はあとで選べます。</p>
+          <p className="text-sm leading-6 text-slate-500">イベント名と日付を入れて作成します。参加確認はあとで選べます。</p>
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">イベント名</span>
             <Input {...form.register('name')} placeholder="文化祭準備ミーティング" />
@@ -899,7 +888,7 @@ export function GroupDetailPage() {
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">共通希望</span>
+            <span className="text-sm font-medium text-slate-700">参加確認</span>
             <Select {...form.register('commonAvailabilitySetId')}>
               <option value="">あとで選ぶ</option>
               {commonAvailabilitySets.map((set) => (
@@ -935,7 +924,7 @@ export function GroupDetailPage() {
       </Modal>
 
       <Modal
-        title={editingAvailabilitySet ? '期間を編集' : '期間を作る'}
+        title={editingAvailabilitySet ? '参加確認を編集' : '参加確認を作る'}
         open={availabilitySetOpen}
         onClose={() => {
           setAvailabilitySetOpen(false)
@@ -1037,7 +1026,7 @@ export function GroupDetailPage() {
                 ? '保存中...'
                 : editingAvailabilitySet
                   ? '保存'
-                  : '期間を作る'}
+                  : '参加確認を作る'}
             </Button>
           </div>
         </form>

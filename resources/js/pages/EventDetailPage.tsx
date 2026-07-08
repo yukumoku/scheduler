@@ -52,7 +52,7 @@ const eventSchema = z.object({
 })
 
 const availabilitySetSchema = z.object({
-  name: z.string().min(1, '期間名を入力してください').max(255),
+  name: z.string().min(1, '参加確認名を入力してください').max(255),
   description: z.string().max(1000).optional().transform((value) => value?.trim() || ''),
   startDate: z.string().min(1, '開始日を入力してください'),
   endDate: z.string().min(1, '終了日を入力してください'),
@@ -700,19 +700,19 @@ export function EventDetailPage() {
 
       if (availabilitySets.length === 0) {
         return {
-          title: '期間を作る',
-          description: 'このイベントで使う参加確認の期間を先に決めます。',
-          primaryLabel: '期間を作る',
+          title: '参加確認を作る',
+          description: 'このイベントで使う参加確認を先に作ります。',
+          primaryLabel: '参加確認を作る',
           primaryAction: () => setAvailabilitySetOpen(true),
           tone: 'violet',
-          actionHint: '参加確認の期間を先に用意します。',
+          actionHint: '参加確認を先に用意します。',
         } as const
       }
 
       if (shifts.length === 0) {
         return {
           title: 'シフトを作る',
-          description: '班と期間がそろったら、下書きを作れます。',
+          description: '班と参加確認がそろったら、下書きを作れます。',
           primaryLabel: 'シフトを見る',
           primaryAction: () => setActiveTab('shifts'),
           tone: 'emerald',
@@ -767,8 +767,8 @@ export function EventDetailPage() {
           description: teams.length === 0 ? '受付班や装飾班を先に分けます。' : '班一覧を確認します。',
         },
         {
-          title: availabilitySets.length === 0 ? '期間を作る' : '期間を見る',
-          description: availabilitySets.length === 0 ? '参加確認の期間を準備します。' : '使っている期間を確認します。',
+          title: availabilitySets.length === 0 ? '参加確認を作る' : '参加確認を見る',
+          description: availabilitySets.length === 0 ? '参加確認を準備します。' : '使っている参加確認を見ます。',
         },
         {
           title: shifts.length === 0 ? 'シフトを作る' : 'シフトを見る',
@@ -780,7 +780,7 @@ export function EventDetailPage() {
     if (canManageEventWorkspace) {
       return [
         { title: '作業を見る', description: '班ごとの作業を確認します。' },
-        { title: '期間を見る', description: 'イベントの期間を確認します。' },
+        { title: '参加確認を見る', description: '行ける日を確認します。' },
         { title: 'シフトを見る', description: '作成済みの内容を確認します。' },
       ]
     }
@@ -803,7 +803,7 @@ export function EventDetailPage() {
     {
       label: 'イベントを削除',
       onClick: () => {
-        if (window.confirm('このイベントを削除しますか？作業、期間、シフトも一緒に削除されます。')) {
+        if (window.confirm('このイベントを削除しますか？作業、参加確認、シフトも一緒に削除されます。')) {
           deleteEventMutation.mutate()
         }
       },
@@ -830,7 +830,7 @@ export function EventDetailPage() {
     <div className="space-y-4 pb-32 md:pb-0">
       <PageHeader
         title={event?.name ?? 'イベント詳細'}
-        description={event?.description ?? '班・期間・シフトを整理します。'}
+        description={event?.description ?? '班・参加確認・シフトを整理します。'}
         action={
           <div className="hidden items-center gap-3 md:flex">
             {event?.groupId ? (
@@ -840,13 +840,13 @@ export function EventDetailPage() {
             ) : null}
             {currentAvailabilitySet ? (
               <Button variant="secondary" onClick={() => navigate(`/availability-sets/${currentAvailabilitySet.id}`)}>
-                期間を開く
+                参加確認を開く
               </Button>
             ) : null}
             {canManageGroupWorkspace ? (
               <>
                 <Button variant="secondary" leftIcon={<CalendarPlus className="h-4 w-4" />} onClick={() => setAvailabilitySetOpen(true)}>
-                  期間を作る
+                  参加確認を作る
                 </Button>
                 <div className="relative">
                   <Button variant="secondary" onClick={() => setActionMenuOpen((current) => !current)} aria-label="その他の操作">
@@ -914,7 +914,7 @@ export function EventDetailPage() {
                   <p className="mt-2 text-base font-semibold text-slate-900">{teams.length}件</p>
                 </Card>
                 <Card className="bg-slate-50">
-                  <p className="text-xs font-medium text-slate-500">期間</p>
+                  <p className="text-xs font-medium text-slate-500">参加確認</p>
                   <p className="mt-2 text-base font-semibold text-slate-900">{availabilitySets.length}件</p>
                 </Card>
                 <Card className="bg-slate-50">
@@ -952,7 +952,7 @@ export function EventDetailPage() {
                 { key: 'overview', label: '概要' },
                 { key: 'teams', label: '班', count: teams.length },
                 { key: 'tasks', label: '作業', count: tasks.length },
-                { key: 'slots', label: '期間設定', count: availabilitySets.length },
+                { key: 'slots', label: '参加確認', count: availabilitySets.length },
                 { key: 'shifts', label: 'シフト', count: shifts.length },
                 { key: 'settings', label: '設定' },
               ]
@@ -961,7 +961,7 @@ export function EventDetailPage() {
                   { key: 'overview', label: '概要' },
                   { key: 'teams', label: '班', count: teams.length },
                   { key: 'tasks', label: '作業', count: tasks.length },
-                  { key: 'slots', label: '期間設定', count: availabilitySets.length },
+                  { key: 'slots', label: '参加確認', count: availabilitySets.length },
                   { key: 'shifts', label: 'シフト', count: shifts.length },
                 ]
               : [
@@ -990,7 +990,7 @@ export function EventDetailPage() {
                   {event?.location || '場所未設定'}
                 </Badge>
                 <Badge variant="brand">
-                  {currentAvailabilitySet ? `期間: ${currentAvailabilitySet.name}` : '期間未設定'}
+                  {currentAvailabilitySet ? `参加確認: ${currentAvailabilitySet.name}` : '参加確認未設定'}
                 </Badge>
                 <Badge variant={event?.status === 'collecting' ? 'warning' : event?.status === 'published' ? 'success' : 'brand'}>
                   {event?.status === 'draft'
@@ -1205,7 +1205,7 @@ export function EventDetailPage() {
                 leftIcon={<CalendarPlus className="h-4 w-4" />}
                 onClick={() => setAvailabilitySetOpen(true)}
               >
-                期間を作る
+                参加確認を作る
               </Button>
             ) : null}
           </div>
@@ -1217,14 +1217,14 @@ export function EventDetailPage() {
               <Card className="border-slate-200 bg-white">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-400">このイベントで使う期間</p>
+                    <p className="text-xs font-semibold text-slate-400">このイベントで使う参加確認</p>
                     <h3 className="mt-1 truncate text-lg font-semibold text-slate-950">
                       {currentAvailabilitySet?.name ?? '未設定'}
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {currentAvailabilitySet
                         ? `${currentAvailabilitySet.startDate ?? '未設定'} 〜 ${currentAvailabilitySet.endDate ?? '未設定'}`
-                        : 'グループで作った期間を選びます。'}
+                        : 'グループで作った参加確認を選びます。'}
                     </p>
                   </div>
                   {currentAvailabilitySet ? (
@@ -1254,7 +1254,7 @@ export function EventDetailPage() {
               <Card className="space-y-4 bg-slate-50/70">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900">グループの期間</h3>
+                    <h3 className="text-base font-semibold text-slate-900">グループの参加確認</h3>
                   </div>
                   <Badge variant="brand">{availabilitySets.length}件</Badge>
                 </div>
@@ -1290,7 +1290,7 @@ export function EventDetailPage() {
                                 disabled={isCurrent || assignAvailabilitySetMutation.isPending}
                                 onClick={() => assignAvailabilitySetMutation.mutate(set.id)}
                               >
-                                {isCurrent ? '設定中' : 'この期間を使う'}
+                                {isCurrent ? '設定中' : 'この参加確認を使う'}
                               </Button>
                             ) : null}
                             <Button
@@ -1308,9 +1308,9 @@ export function EventDetailPage() {
                   </div>
                 ) : (
                   <EmptyState
-                    title="期間はまだありません"
-                    description="グループに期間を作ると、ここで選べます。"
-                    actionLabel={canManageGroupWorkspace ? '期間を作る' : undefined}
+                    title="参加確認はまだありません"
+                    description="グループに参加確認を作ると、ここで選べます。"
+                    actionLabel={canManageGroupWorkspace ? '参加確認を作る' : undefined}
                     onAction={canManageGroupWorkspace ? () => setAvailabilitySetOpen(true) : undefined}
                   />
                 )}
@@ -1330,7 +1330,7 @@ export function EventDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-sm leading-6 text-slate-500">
-            選択した作業に対して、期間・曜日・時間帯をまとめて指定しながら日時を作成できます。
+            選択した作業に対して、日程・曜日・時間帯をまとめて指定しながら日時を作成できます。
           </p>
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">作業</span>
@@ -1549,7 +1549,7 @@ export function EventDetailPage() {
       >
         <div className="space-y-4">
           <p className="text-sm leading-6 text-slate-500">
-            班・期間・希望をもとに、シフトの下書きを作成します。先に設定を確認してから進められます。
+            班・参加確認・希望をもとに、シフトの下書きを作成します。先に設定を確認してから進められます。
           </p>
 
           <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1627,7 +1627,7 @@ export function EventDetailPage() {
 
           {!event?.commonAvailabilitySetId ? (
             <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              期間は未設定です。先に期間を作ると、希望をもとに作成しやすくなります。
+              参加確認は未設定です。先に作ると、希望をもとに作成しやすくなります。
             </p>
           ) : null}
 
@@ -1658,7 +1658,7 @@ export function EventDetailPage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-900">シフトを作成</h2>
-                    <p className="text-sm text-slate-500">班・期間・設定を確認してから、基本のシフトを作ります。</p>
+                    <p className="text-sm text-slate-500">班・参加確認・設定を確認してから、基本のシフトを作ります。</p>
                   </div>
                   <Button
                     variant="primary"
@@ -1669,7 +1669,7 @@ export function EventDetailPage() {
                 </div>
                 {!event?.commonAvailabilitySetId ? (
                   <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                    期間はまだ準備中ですが、班と作業があれば仮のシフトを作成できます。
+                    参加確認はまだ準備中ですが、班と作業があれば仮のシフトを作成できます。
                   </p>
                 ) : null}
                 <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">作成前に設定を確認して、必要なら調整してから進めましょう。</p>
@@ -1798,7 +1798,7 @@ export function EventDetailPage() {
                             {assignments.length ? (
                               assignments.map((assignment) => (
                                 <Badge key={assignment.id} variant={assignment.isLeader ? 'brand' : 'neutral'}>
-                                  {assignment.user?.displayName ?? assignment.user?.email ?? '未設定'}
+                                  {assignment.user?.displayName ?? '名前未設定'}
                                   {assignment.isLeader ? '・リーダー' : ''}
                                 </Badge>
                               ))
@@ -1887,7 +1887,7 @@ export function EventDetailPage() {
                               {assignments.length ? (
                                 assignments.map((assignment) => (
                                   <Badge key={assignment.id} variant={assignment.isLeader ? 'brand' : 'neutral'}>
-                                    {assignment.user?.displayName ?? assignment.user?.email ?? '未設定'}
+                                    {assignment.user?.displayName ?? '名前未設定'}
                                     {assignment.isLeader ? '・リーダー' : ''}
                                   </Badge>
                                 ))
@@ -1923,7 +1923,7 @@ export function EventDetailPage() {
           <Card className="space-y-4">
             <div>
               <h2 className="text-lg font-semibold text-slate-900">イベント編集</h2>
-              <p className="text-sm text-slate-500">タイトルや期間を変更できます。</p>
+              <p className="text-sm text-slate-500">タイトルや参加確認を変更できます。</p>
             </div>
             <Button variant="secondary" leftIcon={<Edit3 className="h-4 w-4" />} onClick={() => setEventEditOpen(true)}>
               イベントを編集
@@ -1939,7 +1939,7 @@ export function EventDetailPage() {
               variant="danger"
               leftIcon={<Trash2 className="h-4 w-4" />}
               onClick={() => {
-                if (window.confirm('このイベントを削除しますか？作業、期間、シフトも一緒に削除されます。')) {
+                if (window.confirm('このイベントを削除しますか？作業、参加確認、シフトも一緒に削除されます。')) {
                   deleteEventMutation.mutate()
                 }
               }}
@@ -2008,7 +2008,7 @@ export function EventDetailPage() {
         </div>
       </Modal>
 
-      <Modal title="期間を作る" open={availabilitySetOpen} onClose={() => setAvailabilitySetOpen(false)}>
+      <Modal title="参加確認を作る" open={availabilitySetOpen} onClose={() => setAvailabilitySetOpen(false)}>
         <form className="space-y-4" onSubmit={availabilitySetForm.handleSubmit((values) => createAvailabilitySetMutation.mutate(values))}>
           <PeriodPreview
             name={availabilitySetPreview.name}
@@ -2043,7 +2043,7 @@ export function EventDetailPage() {
 
           <label className="block space-y-2">
             <span className="text-sm font-medium text-slate-700">名前</span>
-            <Input {...availabilitySetForm.register('name')} placeholder="夏休み期間の参加確認" />
+            <Input {...availabilitySetForm.register('name')} placeholder="夏休みの参加確認" />
             {availabilitySetForm.formState.errors.name ? <p className="text-sm text-rose-600">{availabilitySetForm.formState.errors.name.message}</p> : null}
           </label>
 
@@ -2080,7 +2080,7 @@ export function EventDetailPage() {
               キャンセル
             </Button>
             <Button type="submit" disabled={createAvailabilitySetMutation.isPending} leftIcon={<CalendarPlus className="h-4 w-4" />}>
-              期間を作る
+              参加確認を作る
             </Button>
           </div>
         </form>
@@ -2105,7 +2105,7 @@ export function EventDetailPage() {
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">期間</span>
+            <span className="text-sm font-medium text-slate-700">参加確認</span>
             <Select {...eventForm.register('commonAvailabilitySetId')}>
               <option value="">あとで選ぶ</option>
               {availabilitySets.map((set) => (
@@ -2114,10 +2114,10 @@ export function EventDetailPage() {
                 </option>
               ))}
             </Select>
-            <p className="text-xs text-slate-500">未選択でも作成できます。イベントで作った期間を選べます。</p>
+            <p className="text-xs text-slate-500">未選択でも作成できます。イベントで作った参加確認を選べます。</p>
           </label>
 
-          <p className="text-sm leading-6 text-slate-500">先に期間を決めると、あとから班の作業やシフトを整理しやすくなります。</p>
+          <p className="text-sm leading-6 text-slate-500">先に参加確認を作ると、あとから班の作業やシフトを整理しやすくなります。</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-2">

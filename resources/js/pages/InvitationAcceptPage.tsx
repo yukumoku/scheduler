@@ -59,10 +59,10 @@ export function InvitationAcceptPage() {
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <p className="text-sm leading-6 text-slate-600">
-                  {invitationQuery.data?.inviter?.displayName ?? invitationQuery.data?.inviter?.email ?? 'メンバー'} さんから招待されています。
+                  {invitationQuery.data?.inviter?.displayName ?? 'メンバー'} さんから招待されています。
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {invitationQuery.data?.email ? <Badge variant="neutral">宛先: {invitationQuery.data.email}</Badge> : <Badge variant="brand">リンクを知っている人が参加できます</Badge>}
+                  <Badge variant="brand">招待コードで参加できます</Badge>
                   {invitationQuery.data?.expiresAt ? <Badge variant="neutral">期限 {new Date(invitationQuery.data.expiresAt).toLocaleDateString('ja-JP')}</Badge> : null}
                 </div>
               </div>

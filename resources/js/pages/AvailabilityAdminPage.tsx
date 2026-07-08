@@ -96,8 +96,8 @@ export function AvailabilityAdminPage() {
                 <Card key={member.id} className="bg-slate-50">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-slate-900">{member.displayName ?? member.email ?? '名前未設定'}</p>
-                      <p className="mt-1 text-sm text-slate-500">{member.email}</p>
+                      <p className="font-semibold text-slate-900">{member.displayName ?? '名前未設定'}</p>
+                      <p className="mt-1 text-sm text-slate-500">メンバー</p>
                     </div>
                     <Badge variant={member.hasSubmitted ? 'success' : 'warning'}>
                       {member.hasSubmitted ? '提出済み' : '未提出'}

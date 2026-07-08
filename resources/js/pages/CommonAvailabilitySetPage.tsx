@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { CalendarCheck2, Plus, Save, Users } from 'lucide-react'
+import { CalendarCheck2, Clock3, Plus, RotateCcw, Save, Trash2, Users } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -118,6 +118,7 @@ export function CommonAvailabilitySetPage() {
   const [modalDate, setModalDate] = useState<string | null>(null)
   const [modalDrafts, setModalDrafts] = useState<AvailabilityDraft[]>([])
   const [monthCursor, setMonthCursor] = useState<string>('')
+  const [hasLocalChanges, setHasLocalChanges] = useState(false)
 
   useEffect(() => {
     setModalDate(null)
@@ -163,6 +164,7 @@ export function CommonAvailabilitySetPage() {
       }
     }
     setDrafts(nextDrafts)
+    setHasLocalChanges(false)
   }, [meQuery.data?.slots])
 
   const saveMutation = useMutation({
@@ -177,6 +179,7 @@ export function CommonAvailabilitySetPage() {
       await queryClient.invalidateQueries({ queryKey: ['group', setQuery.data?.groupId, 'common-availability-sets'] })
       await queryClient.invalidateQueries({ queryKey: ['group', setQuery.data?.groupId, 'members'] })
       await queryClient.invalidateQueries({ queryKey: ['group', setQuery.data?.groupId, 'events'] })
+      setHasLocalChanges(false)
     },
   })
 
@@ -211,12 +214,13 @@ export function CommonAvailabilitySetPage() {
     [drafts],
   )
   const submissions = submissionsQuery.data
+  const filledDateCount = useMemo(() => new Set(savedDrafts.map((draft) => draft.date)).size, [savedDrafts])
   const relatedEvents = useMemo(
     () => (Array.isArray(relatedEventsQuery.data) ? relatedEventsQuery.data.filter((event) => event.commonAvailabilitySetId === setId) : []),
     [relatedEventsQuery.data, setId],
   )
   if (!setId) {
-    return <EmptyState title="参加可能日時セットが見つかりません" description="URLを確認してください。" />
+    return <EmptyState title="参加確認が見つかりません" description="URLを確認してください。" />
   }
 
   if (setQuery.isLoading || meQuery.isLoading) {
@@ -284,6 +288,7 @@ export function CommonAvailabilitySetPage() {
       return next
     })
 
+    setHasLocalChanges(true)
     closeDateModal()
   }
 
@@ -312,16 +317,35 @@ export function CommonAvailabilitySetPage() {
     setModalDrafts((current) => current.filter((_, draftIndex) => draftIndex !== index))
   }
 
+  const clearModalDate = () => {
+    if (!modalDate) return
+
+    setDrafts((current) => Object.fromEntries(Object.entries(current).filter(([, value]) => value.date !== modalDate)))
+    setHasLocalChanges(true)
+    closeDateModal()
+  }
+
+  const removeSavedDraft = (draft: AvailabilityDraft) => {
+    setDrafts((current) => {
+      const next = { ...current }
+      delete next[`${draft.date}|${draft.startTime}|${draft.endTime}`]
+      return next
+    })
+    setHasLocalChanges(true)
+  }
+
+  const clearAllDrafts = () => {
+    if (!savedDrafts.length) return
+    if (!window.confirm('入力済みの参加確認をすべて取り消しますか？')) return
+
+    setDrafts({})
+    setHasLocalChanges(true)
+  }
+
   return (
     <div className="space-y-4 pb-44 md:pb-32">
-      {activeTab === 'input' && savedDrafts.length === 0 ? (
-        <div className="sticky top-3 z-20 rounded-2xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-sm font-medium text-amber-900 shadow-sm backdrop-blur">
-          参加できる日を入力してください。入力していない日は「参加できない」として扱われます。
-        </div>
-      ) : null}
-
       <PageHeader
-        title={setData?.name ?? '参加可能日時'}
+        title={setData?.name ?? '参加確認'}
         description={setData?.description ?? '日付を選んで、行ける時間だけ入力します。'}
         action={
           <Button variant="secondary" onClick={() => navigate(-1)}>
@@ -330,15 +354,22 @@ export function CommonAvailabilitySetPage() {
         }
       />
 
-      <Card className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Badge variant="neutral">
-            {setData?.startDate ?? '未設定'} 〜 {setData?.endDate ?? '未設定'}
-          </Badge>
-          <Badge variant="brand">期限 {setData?.deadline ?? 'なし'}</Badge>
-          <Badge variant="info">{setData?.availabilityCount ?? 0}件提出</Badge>
+      <div className="rounded-[1.35rem] border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-2xl bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-medium text-slate-500">日数</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-950">{periodDates.length}日</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-medium text-slate-500">入力日</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-950">{filledDateCount}日</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-medium text-slate-500">時間</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-950">{savedDrafts.length}件</p>
+          </div>
         </div>
-      </Card>
+      </div>
 
       <Card className="space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -396,14 +427,18 @@ export function CommonAvailabilitySetPage() {
       {activeTab === 'input' ? (
         <div className="space-y-4">
           <Card className="space-y-4 border-slate-200 bg-white">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">日付を選ぶ</h2>
-                <p className="text-sm text-slate-500">参加できる日だけ押して、時間を追加します。</p>
+                <h2 className="text-lg font-semibold text-slate-900">行ける日</h2>
+                <p className="text-sm text-slate-500">入力がない日は参加できない扱いです。</p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Badge variant="brand">{periodDates.length}日</Badge>
-                <Badge variant="neutral">{Object.keys(drafts).length}件入力済み</Badge>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                {hasLocalChanges ? <Badge variant="warning">未保存</Badge> : <Badge variant="neutral">保存済み</Badge>}
+                {savedDrafts.length ? (
+                  <Button type="button" size="sm" variant="ghost" leftIcon={<RotateCcw className="h-4 w-4" />} onClick={clearAllDrafts}>
+                    すべて取り消す
+                  </Button>
+                ) : null}
               </div>
             </div>
 
@@ -470,7 +505,7 @@ export function CommonAvailabilitySetPage() {
                           className={[
                             'flex aspect-square flex-col justify-between rounded-xl border p-1.5 text-left transition sm:rounded-2xl sm:p-2',
                             hasEntries
-                              ? 'border-slate-950 bg-slate-950 text-white shadow-sm'
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-950 shadow-sm'
                               : isActive
                                 ? 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                                 : isInPeriod
@@ -480,13 +515,13 @@ export function CommonAvailabilitySetPage() {
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold">{date.slice(8, 10)}</span>
-                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-white/70' : 'text-slate-400'].join(' ')}>{weekdayLabel}</span>
+                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-emerald-700' : 'text-slate-400'].join(' ')}>{weekdayLabel}</span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-white/70' : 'text-slate-400'].join(' ')}>
+                            <span className={['hidden text-[11px] sm:inline', hasEntries ? 'text-emerald-700' : 'text-slate-400'].join(' ')}>
                               {hasEntries ? '入力済み' : isActive ? '未入力' : isInPeriod ? '休み' : ''}
                             </span>
-                            <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', hasEntries ? 'bg-white text-slate-950' : isActive ? 'bg-slate-100 text-slate-500' : 'bg-transparent text-slate-300'].join(' ')}>
+                            <span className={['rounded-full px-2 py-0.5 text-[10px] font-semibold', hasEntries ? 'bg-emerald-600 text-white' : isActive ? 'bg-slate-100 text-slate-500' : 'bg-transparent text-slate-300'].join(' ')}>
                               {hasEntries ? `${dayEntries.length}` : isActive ? '＋' : ''}
                             </span>
                           </div>
@@ -496,14 +531,14 @@ export function CommonAvailabilitySetPage() {
                 </div>
               </div>
             ) : (
-              <EmptyState title="期間がまだありません" description="先にイベント側で開始日と終了日を入れてください。" />
+              <EmptyState title="参加確認がまだありません" description="先に確認する日程を作成してください。" />
             )}
           </Card>
 
           <Card className="space-y-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">入力済みの日時</h2>
+                <h2 className="text-lg font-semibold text-slate-900">入力済み</h2>
               </div>
               <Button type="button" variant="secondary" onClick={() => setActiveTab('submissions')}>
                 提出状況を見る
@@ -512,22 +547,30 @@ export function CommonAvailabilitySetPage() {
             {savedDrafts.length ? (
               <div className="space-y-2">
                 {savedDrafts.map((draft) => (
-                  <button
+                  <div
                     key={`${draft.date}|${draft.startTime}|${draft.endTime}`}
-                    type="button"
-                    onClick={() => openDateModal(draft.date)}
-                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:bg-white"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 transition hover:bg-white"
                   >
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-900">
-                        {draft.date} {formatTime(draft.startTime)} - {formatTime(draft.endTime)}
-                      </p>
-                      <p className="text-sm text-slate-500">{draft.comment || 'コメントなし'}</p>
+                    <button type="button" onClick={() => openDateModal(draft.date)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-slate-700 ring-1 ring-slate-200">
+                        <Clock3 className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-slate-900">
+                          {draft.date} {formatTime(draft.startTime)} - {formatTime(draft.endTime)}
+                        </span>
+                        <span className="block truncate text-sm text-slate-500">{draft.comment || (draft.status === 'preferred' ? 'できれば参加' : '参加できる')}</span>
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge variant={draft.status === 'preferred' ? 'warning' : 'success'}>
+                        {draft.status === 'preferred' ? 'できれば' : '参加'}
+                      </Badge>
+                      <Button type="button" size="sm" variant="ghost" aria-label="取り消す" onClick={() => removeSavedDraft(draft)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Badge variant={draft.status === 'preferred' ? 'warning' : draft.status === 'unavailable' ? 'danger' : 'success'}>
-                      {draft.status === 'preferred' ? 'できれば参加' : draft.status === 'unavailable' ? '参加できない' : '参加できる'}
-                    </Badge>
-                  </button>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -566,8 +609,8 @@ export function CommonAvailabilitySetPage() {
                     {submissions.members.map((member) => (
                       <tr key={member.id} className="bg-white">
                         <td className="px-4 py-4 align-top">
-                          <p className="font-semibold text-slate-900">{member.displayName ?? member.email ?? '名前未設定'}</p>
-                          <p className="text-sm text-slate-500">{member.email ?? 'メールアドレスなし'}</p>
+                          <p className="font-semibold text-slate-900">{member.displayName ?? '名前未設定'}</p>
+                          <p className="text-sm text-slate-500">メンバー</p>
                         </td>
                         <td className="px-4 py-4 align-top text-sm text-slate-600">{member.submittedSlots}件</td>
                         <td className="px-4 py-4 align-top text-sm text-slate-600">{member.availableSlots}件</td>
@@ -635,7 +678,7 @@ export function CommonAvailabilitySetPage() {
                   </table>
                 </div>
               ) : (
-                <EmptyState title="時間帯がありません" description="セットの期間に応じた集計を表示します。" />
+                <EmptyState title="時間帯がありません" description="参加確認に応じた集計を表示します。" />
               )}
             </div>
           </Card>
@@ -643,7 +686,7 @@ export function CommonAvailabilitySetPage() {
       ) : null}
 
       <Modal
-        title={modalDate ? `${modalDate} の時間を入力` : '時間を入力'}
+        title={modalDate ? `${modalDate} の入力` : '時間を入力'}
         open={Boolean(modalDate)}
         onClose={closeDateModal}
       >
@@ -656,6 +699,12 @@ export function CommonAvailabilitySetPage() {
           <div className="space-y-3">
             {modalDrafts.map((draft, index) => (
               <div key={`${index}-${draft.startTime}-${draft.endTime}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">時間 {index + 1}</p>
+                  <Button type="button" size="sm" variant="ghost" leftIcon={<Trash2 className="h-4 w-4" />} onClick={() => removeModalDraft(index)}>
+                    取り消す
+                  </Button>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block space-y-2">
                     <span className="text-sm font-medium text-slate-700">開始</span>
@@ -707,21 +756,26 @@ export function CommonAvailabilitySetPage() {
                   />
                 </label>
 
-                {modalDrafts.length > 1 ? (
-                  <div className="mt-3 flex justify-end">
-                    <Button type="button" size="sm" variant="danger" onClick={() => removeModalDraft(index)}>
-                      この時間を削除
-                    </Button>
-                  </div>
-                ) : null}
               </div>
             ))}
           </div>
 
+          {modalDrafts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
+              <p className="text-sm font-semibold text-slate-900">この日は未入力です</p>
+              <p className="mt-1 text-sm text-slate-500">保存すると、この日の入力は取り消されます。</p>
+            </div>
+          ) : null}
+
           <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-            <Button type="button" variant="secondary" className="w-full sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft}>
-              時間を追加
-            </Button>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft}>
+                追加
+              </Button>
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" leftIcon={<Trash2 className="h-4 w-4" />} onClick={clearModalDate}>
+                この日を取り消す
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
               <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={closeDateModal}>
                 キャンセル
@@ -736,9 +790,11 @@ export function CommonAvailabilitySetPage() {
 
       <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-slate-200 bg-white/95 px-3 py-2 backdrop-blur md:bottom-0 md:left-72 md:px-4 md:py-3">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
-          <p className="hidden text-sm text-slate-500 sm:block">{saveMutation.isPending ? '保存中...' : '入力後に保存します'}</p>
-          <Button className="w-full sm:w-auto" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || savedDrafts.length === 0} leftIcon={<Save className="h-4 w-4" />}>
-            希望を保存
+          <p className="hidden text-sm text-slate-500 sm:block">
+            {saveMutation.isPending ? '保存中...' : hasLocalChanges ? '変更があります' : '最新です'}
+          </p>
+          <Button className="w-full sm:w-auto" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !hasLocalChanges} leftIcon={<Save className="h-4 w-4" />}>
+            変更を保存
           </Button>
         </div>
       </div>
