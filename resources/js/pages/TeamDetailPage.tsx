@@ -393,6 +393,7 @@ export function TeamDetailPage() {
   const selectedWorkPeriod = availabilitySets.find((set) => set.id === selectedWorkPeriodId) ?? null
   const taskRequiredMemberIds = taskForm.watch('requiredMemberIds') ?? []
   const taskDesiredTotalHours = taskForm.watch('desiredTotalHours')
+  const taskRequiredPeoplePerSlot = taskForm.watch('requiredPeoplePerSlot') || 1
   const taskRequiredMembers = useMemo(
     () =>
       taskRequiredMemberIds
@@ -581,6 +582,7 @@ export function TeamDetailPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:justify-start">
                     {task.allowCrossTeamHelp ? <Badge variant="info">ヘルプ可</Badge> : <Badge variant="neutral">通常</Badge>}
+                    <Badge variant="neutral">1回 {task.requiredPeoplePerSlot}人</Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-slate-600">
@@ -939,6 +941,14 @@ export function TeamDetailPage() {
                 <p className="text-sm text-rose-600">{taskForm.formState.errors.desiredTotalHours.message}</p>
               ) : null}
             </label>
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">一度に入る人数</span>
+              <Input type="number" min={1} step={1} {...taskForm.register('requiredPeoplePerSlot')} />
+              <p className="text-xs leading-6 text-slate-500">同じ時間に何人で作業するかを決めます。作業時間の合計は人数倍しません。</p>
+              {taskForm.formState.errors.requiredPeoplePerSlot ? (
+                <p className="text-sm text-rose-600">{taskForm.formState.errors.requiredPeoplePerSlot.message}</p>
+              ) : null}
+            </label>
           </div>
 
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
@@ -960,7 +970,7 @@ export function TeamDetailPage() {
                 onClick={() =>
                   setDesiredPeriods((current) => [
                     ...current,
-                    { date: '', startTime: '09:00', endTime: '12:00', requiredPeople: 1, location: '', note: '' },
+                    { date: '', startTime: '09:00', endTime: '12:00', requiredPeople: taskRequiredPeoplePerSlot, location: '', note: '' },
                   ])
                 }
               >
@@ -988,6 +998,7 @@ export function TeamDetailPage() {
                       <Input
                         type="number"
                         min={1}
+                        step={1}
                         value={period.requiredPeople}
                         onChange={(event) =>
                           setDesiredPeriods((current) =>

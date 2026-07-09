@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ImagePlus, Save, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
+import { resizeAvatarFile } from '@/lib/image'
 import { clearTutorialCompletedLocally } from '@/lib/onboarding'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -26,6 +27,7 @@ export function AccountSettingsPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: api.auth.me,
@@ -76,6 +78,21 @@ export function AccountSettingsPage() {
     return meQuery.data?.avatarUrl ?? null
   }, [avatarFile, meQuery.data?.avatarUrl])
 
+  const handleAvatarChange = async (file: File | null) => {
+    setAvatarError(null)
+    if (!file) {
+      setAvatarFile(null)
+      return
+    }
+
+    try {
+      setAvatarFile(await resizeAvatarFile(file))
+    } catch (error) {
+      setAvatarFile(null)
+      setAvatarError(error instanceof Error ? error.message : '画像を読み込めませんでした。')
+    }
+  }
+
   if (meQuery.isError) {
     return <EmptyState title="ログインが必要です" description="アカウント設定を開くにはログインしてください。" />
   }
@@ -104,9 +121,11 @@ export function AccountSettingsPage() {
                     type="file"
                     accept="image/png,image/jpeg,image/webp,image/gif"
                     className="hidden"
-                    onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
+                    onChange={(event) => void handleAvatarChange(event.target.files?.[0] ?? null)}
                   />
                 </label>
+                {avatarError ? <p className="text-sm text-rose-600">{avatarError}</p> : null}
+                {avatarFile ? <p className="text-sm text-slate-500">保存しやすいサイズに調整しました。</p> : null}
               </div>
             </div>
 

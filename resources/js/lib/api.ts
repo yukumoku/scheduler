@@ -102,6 +102,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       status: response.status,
       body: rawBody,
     })
+    if (response.status === 413) {
+      throw new Error('画像が大きすぎます。小さめの画像を選んでください。')
+    }
     throw new Error(`Request failed: ${response.status}`)
   }
 

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { CircleHelp, ImagePlus, Sparkles, Users } from 'lucide-react'
 import { api } from '@/lib/api'
+import { resizeAvatarFile } from '@/lib/image'
 import { isTutorialCompletedLocally, markTutorialCompletedLocally } from '@/lib/onboarding'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -28,6 +29,7 @@ export function TutorialPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [displayName, setDisplayName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
   const [inviteCode, setInviteCode] = useState('')
   const meQuery = useQuery({
     queryKey: ['auth', 'me'],
@@ -61,6 +63,21 @@ export function TutorialPage() {
 
     return meQuery.data?.avatarUrl ?? null
   }, [avatarFile, meQuery.data?.avatarUrl])
+
+  const handleAvatarChange = async (file: File | null) => {
+    setAvatarError(null)
+    if (!file) {
+      setAvatarFile(null)
+      return
+    }
+
+    try {
+      setAvatarFile(await resizeAvatarFile(file))
+    } catch (error) {
+      setAvatarFile(null)
+      setAvatarError(error instanceof Error ? error.message : '画像を読み込めませんでした。')
+    }
+  }
 
   const saveProfileMutation = useMutation({
     mutationFn: () =>
@@ -210,9 +227,11 @@ export function TutorialPage() {
                           type="file"
                           accept="image/png,image/jpeg,image/webp,image/gif"
                           className="hidden"
-                          onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
+                          onChange={(event) => void handleAvatarChange(event.target.files?.[0] ?? null)}
                         />
                       </label>
+                      {avatarError ? <p className="text-sm text-rose-600">{avatarError}</p> : null}
+                      {avatarFile ? <p className="text-sm text-slate-500">保存しやすいサイズに調整しました。</p> : null}
                     </div>
 
                     <div className="space-y-3">
