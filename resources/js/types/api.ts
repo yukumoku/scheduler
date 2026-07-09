@@ -327,7 +327,7 @@ export type Shift = {
 }
 
 export type ShiftWarning = {
-  slotId: string
+  slotId: string | null
   taskId: string | null
   date: string | null
   startTime: string | null
@@ -335,6 +335,7 @@ export type ShiftWarning = {
   requiredPeople: number
   assignedPeople: number
   missingPeople: number
+  missingMinutes?: number
   message: string
 }
 

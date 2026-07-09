@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CalendarCheck2, Clock3, Plus, RotateCcw, Save, Trash2, Users } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/Badge'
@@ -17,17 +17,24 @@ type AvailabilityDraft = {
   date: string
   startTime: string
   endTime: string
-  status: 'available' | 'unavailable' | 'preferred'
+  status: 'available' | 'preferred'
   comment: string
 }
 
 const statusOptions = [
   { value: 'available', label: '参加できる', variant: 'success' as const },
   { value: 'preferred', label: 'できれば参加', variant: 'warning' as const },
-]
+] as const
 
 function formatTime(value: string) {
   return value.slice(0, 5)
+}
+
+function addMinutes(time: string, minutes: number): string {
+  const [hourPart, minutePart] = time.split(':')
+  const date = new Date(2000, 0, 1, Number(hourPart), Number(minutePart))
+  date.setMinutes(date.getMinutes() + minutes)
+  return `${`${date.getHours()}`.padStart(2, '0')}:${`${date.getMinutes()}`.padStart(2, '0')}`
 }
 
 function formatLocalDate(date: Date): string {
@@ -137,16 +144,23 @@ export function CommonAvailabilitySetPage() {
     enabled: Boolean(setId),
   })
 
+  const groupQuery = useQuery({
+    queryKey: ['group', setQuery.data?.groupId],
+    queryFn: () => api.groups.show(setQuery.data?.groupId ?? ''),
+    enabled: Boolean(setQuery.data?.groupId),
+  })
+  const canViewSubmissions = groupQuery.data?.myRole === 'owner'
   const submissionsQuery = useQuery({
     queryKey: ['common-availability-set', setId, 'submissions'],
     queryFn: () => api.commonAvailabilitySets.submissions(setId ?? ''),
-    enabled: Boolean(setId) && activeTab === 'submissions',
+    enabled: Boolean(setId) && canViewSubmissions && activeTab === 'submissions',
   })
-  const relatedEventsQuery = useQuery({
-    queryKey: ['group', setQuery.data?.groupId, 'events'],
-    queryFn: () => api.groups.events(setQuery.data?.groupId ?? ''),
-    enabled: Boolean(setQuery.data?.groupId),
-  })
+
+  useEffect(() => {
+    if (!canViewSubmissions && activeTab === 'submissions') {
+      setActiveTab('input')
+    }
+  }, [activeTab, canViewSubmissions])
 
   useEffect(() => {
     const nextDrafts: Record<string, AvailabilityDraft> = {}
@@ -215,10 +229,6 @@ export function CommonAvailabilitySetPage() {
   )
   const submissions = submissionsQuery.data
   const filledDateCount = useMemo(() => new Set(savedDrafts.map((draft) => draft.date)).size, [savedDrafts])
-  const relatedEvents = useMemo(
-    () => (Array.isArray(relatedEventsQuery.data) ? relatedEventsQuery.data.filter((event) => event.commonAvailabilitySetId === setId) : []),
-    [relatedEventsQuery.data, setId],
-  )
   if (!setId) {
     return <EmptyState title="参加確認が見つかりません" description="URLを確認してください。" />
   }
@@ -244,18 +254,10 @@ export function CommonAvailabilitySetPage() {
             date,
             startTime: draft.startTime,
             endTime: draft.endTime,
-            status: draft.status === 'available' || draft.status === 'preferred' ? draft.status : 'unavailable',
+            status: draft.status === 'preferred' ? 'preferred' : 'available',
             comment: draft.comment,
           }))
-        : [
-            {
-              date,
-              startTime: activityWindow.startTime,
-              endTime: activityWindow.endTime,
-              status: 'available',
-              comment: '',
-            },
-          ],
+        : [],
     )
   }
 
@@ -273,14 +275,18 @@ export function CommonAvailabilitySetPage() {
       const next = Object.fromEntries(Object.entries(current).filter(([, value]) => value.date !== modalDate))
 
       for (const draft of modalDrafts) {
-        if (!draft.startTime || !draft.endTime || draft.startTime >= draft.endTime) continue
-        if (draft.startTime < activityWindow.startTime || draft.endTime > activityWindow.endTime) continue
+        if (!draft.startTime || !draft.endTime || draft.startTime >= draft.endTime) {
+          continue
+        }
+        if (draft.startTime < activityWindow.startTime || draft.endTime > activityWindow.endTime) {
+          continue
+        }
         const key = `${modalDate}|${draft.startTime}|${draft.endTime}`
         next[key] = {
           date: modalDate,
           startTime: draft.startTime,
           endTime: draft.endTime,
-          status: draft.status === 'available' || draft.status === 'preferred' ? draft.status : 'unavailable',
+          status: draft.status === 'preferred' ? 'preferred' : 'available',
           comment: draft.comment,
         }
       }
@@ -300,13 +306,16 @@ export function CommonAvailabilitySetPage() {
     if (!modalDate) return
     const activityWindow = getActivityWindow(modalDate, setData?.activityRules)
     if (!activityWindow) return
+    const lastDraft = [...modalDrafts].sort((a, b) => a.endTime.localeCompare(b.endTime)).at(-1)
+    const startTime = lastDraft?.endTime && lastDraft.endTime < activityWindow.endTime ? lastDraft.endTime : activityWindow.startTime
+    const endTime = addMinutes(startTime, 60) <= activityWindow.endTime ? addMinutes(startTime, 60) : activityWindow.endTime
 
     setModalDrafts((current) => [
       ...current,
       {
         date: modalDate,
-        startTime: activityWindow.startTime,
-        endTime: activityWindow.endTime,
+        startTime,
+        endTime,
         status: 'available',
         comment: '',
       },
@@ -342,6 +351,36 @@ export function CommonAvailabilitySetPage() {
     setHasLocalChanges(true)
   }
 
+  const modalActivityWindow = modalDate ? getActivityWindow(modalDate, setData?.activityRules) : null
+  const modalDraftKeys = modalDrafts.map((draft) => `${draft.startTime}|${draft.endTime}`)
+  const hasDuplicateModalDraft = modalDraftKeys.length !== new Set(modalDraftKeys).size
+  const modalValidationError = (() => {
+    if (!modalActivityWindow) {
+      return null
+    }
+
+    for (const draft of modalDrafts) {
+      if (!draft.startTime || !draft.endTime) {
+        return '開始と終了を入力してください。'
+      }
+      if (draft.startTime >= draft.endTime) {
+        return '終了は開始より後にしてください。'
+      }
+      if (draft.startTime < modalActivityWindow.startTime || draft.endTime > modalActivityWindow.endTime) {
+        return `入力できるのは ${modalActivityWindow.startTime} - ${modalActivityWindow.endTime} の間です。`
+      }
+    }
+
+    if (hasDuplicateModalDraft) {
+      return '同じ時間帯が重複しています。'
+    }
+
+    return null
+  })()
+  const canAddModalDraft = Boolean(
+    modalActivityWindow && (!modalDrafts.length || modalDrafts.some((draft) => draft.endTime < modalActivityWindow.endTime)),
+  )
+
   return (
     <div className="space-y-4 pb-44 md:pb-32">
       <PageHeader
@@ -371,36 +410,9 @@ export function CommonAvailabilitySetPage() {
         </div>
       </div>
 
-      <Card className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">関連イベント</h2>
-          </div>
-          <Badge variant="info">{relatedEvents.length}件</Badge>
-        </div>
-        {relatedEvents.length ? (
-          <div className="space-y-2">
-            {relatedEvents.map((event) => (
-              <Link
-                key={event.id}
-                to={`/events/${event.id}`}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-900">{event.name}</p>
-                  <p className="text-sm text-slate-500">{event.location || '場所未設定'}</p>
-                </div>
-                <Badge variant="neutral">{event.status}</Badge>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <EmptyState title="関連イベントはありません" description="イベント側で使うと表示されます。" />
-        )}
-      </Card>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-        <div className="grid grid-cols-2 gap-2">
+      {canViewSubmissions ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('input')}
@@ -421,8 +433,9 @@ export function CommonAvailabilitySetPage() {
           >
             提出状況
           </button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {activeTab === 'input' ? (
         <div className="space-y-4">
@@ -540,9 +553,11 @@ export function CommonAvailabilitySetPage() {
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">入力済み</h2>
               </div>
-              <Button type="button" variant="secondary" onClick={() => setActiveTab('submissions')}>
+              {canViewSubmissions ? (
+                <Button type="button" variant="secondary" onClick={() => setActiveTab('submissions')}>
                 提出状況を見る
-              </Button>
+                </Button>
+              ) : null}
             </div>
             {savedDrafts.length ? (
               <div className="space-y-2">
@@ -580,7 +595,7 @@ export function CommonAvailabilitySetPage() {
         </div>
       ) : null}
 
-      {activeTab === 'submissions' ? (
+      {canViewSubmissions && activeTab === 'submissions' ? (
         <div className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
           <Card className="space-y-4">
             <div className="flex items-center gap-2">
@@ -691,9 +706,9 @@ export function CommonAvailabilitySetPage() {
         onClose={closeDateModal}
       >
         <div className="space-y-4">
-          {modalDate && getActivityWindow(modalDate, setData?.activityRules) ? (
+          {modalDate && modalActivityWindow ? (
             <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              入力できる時間: {getActivityWindow(modalDate, setData?.activityRules)?.startTime} - {getActivityWindow(modalDate, setData?.activityRules)?.endTime}
+              入力できる時間: {modalActivityWindow.startTime} - {modalActivityWindow.endTime}
             </p>
           ) : null}
           <div className="space-y-3">
@@ -711,8 +726,8 @@ export function CommonAvailabilitySetPage() {
                     <Input
                       type="time"
                       step={300}
-                      min={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.startTime : undefined}
-                      max={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.endTime : undefined}
+                      min={modalActivityWindow?.startTime}
+                      max={modalActivityWindow?.endTime}
                       value={draft.startTime}
                       onChange={(event) => updateModalDraft(index, { startTime: event.target.value })}
                     />
@@ -722,13 +737,14 @@ export function CommonAvailabilitySetPage() {
                     <Input
                       type="time"
                       step={300}
-                      min={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.startTime : undefined}
-                      max={modalDate ? getActivityWindow(modalDate, setData?.activityRules)?.endTime : undefined}
+                      min={modalActivityWindow?.startTime}
+                      max={modalActivityWindow?.endTime}
                       value={draft.endTime}
                       onChange={(event) => updateModalDraft(index, { endTime: event.target.value })}
                     />
                   </label>
                 </div>
+                <p className="mt-2 text-xs text-slate-500">5分単位で入力できます。範囲外の時間は保存できません。</p>
 
                 <div className="mt-3 space-y-2">
                   <span className="text-sm font-medium text-slate-700">参加しやすさ</span>
@@ -763,14 +779,17 @@ export function CommonAvailabilitySetPage() {
           {modalDrafts.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center">
               <p className="text-sm font-semibold text-slate-900">この日は未入力です</p>
-              <p className="mt-1 text-sm text-slate-500">保存すると、この日の入力は取り消されます。</p>
+              <p className="mt-1 text-sm text-slate-500">時間を追加するか、このまま保存して未入力に戻せます。</p>
             </div>
+          ) : null}
+          {modalValidationError ? (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{modalValidationError}</p>
           ) : null}
 
           <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
-              <Button type="button" variant="secondary" className="w-full sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft}>
-                追加
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" leftIcon={<Plus className="h-4 w-4" />} onClick={addModalDraft} disabled={!canAddModalDraft}>
+                時間を追加
               </Button>
               <Button type="button" variant="ghost" className="w-full sm:w-auto" leftIcon={<Trash2 className="h-4 w-4" />} onClick={clearModalDate}>
                 この日を取り消す
@@ -780,7 +799,7 @@ export function CommonAvailabilitySetPage() {
               <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={closeDateModal}>
                 キャンセル
               </Button>
-              <Button type="button" className="w-full sm:w-auto" onClick={saveDateModal}>
+              <Button type="button" className="w-full sm:w-auto" onClick={saveDateModal} disabled={Boolean(modalValidationError)}>
                 保存
               </Button>
             </div>
@@ -793,6 +812,9 @@ export function CommonAvailabilitySetPage() {
           <p className="hidden text-sm text-slate-500 sm:block">
             {saveMutation.isPending ? '保存中...' : hasLocalChanges ? '変更があります' : '最新です'}
           </p>
+          {saveMutation.error instanceof Error ? (
+            <p className="hidden rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700 md:block">{saveMutation.error.message}</p>
+          ) : null}
           <Button className="w-full sm:w-auto" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !hasLocalChanges} leftIcon={<Save className="h-4 w-4" />}>
             変更を保存
           </Button>

@@ -58,6 +58,14 @@ class EventTaskUpdateRequest extends FormRequest
             if ($workStartDate && $workEndDate && $workStartDate > $workEndDate) {
                 $validator->errors()->add('workEndDate', '終了日は開始日以降にしてください。');
             }
+
+            $desiredTotalHours = $this->input('desiredTotalHours');
+            $validDesiredPeriods = collect((array) $this->input('desiredPeriods', []))
+                ->filter(fn ($period) => ! empty($period['date']) && ! empty($period['startTime']) && ! empty($period['endTime']))
+                ->count();
+            if (($desiredTotalHours === null || $desiredTotalHours === '') && $validDesiredPeriods === 0) {
+                $validator->errors()->add('desiredTotalHours', '作業に必要な時間を入力してください。日時が決まっている作業は、日時候補を追加してください。');
+            }
         });
     }
 }

@@ -299,9 +299,20 @@ class AvailabilitySummaryService
     private function filterCommonAvailabilities(Collection $availabilities, array $slot): Collection
     {
         return $availabilities->filter(function (CommonAvailability $availability) use ($slot) {
-            return $availability->date?->toDateString() === $slot['date']
-                && $this->normalizeTime($availability->start_time) === $this->normalizeTime($slot['startTime'])
-                && $this->normalizeTime($availability->end_time) === $this->normalizeTime($slot['endTime']);
+            if ($availability->date?->toDateString() !== $slot['date']) {
+                return false;
+            }
+
+            $availabilityStart = $this->normalizeTime($availability->start_time);
+            $availabilityEnd = $this->normalizeTime($availability->end_time);
+            $slotStart = $this->normalizeTime($slot['startTime']);
+            $slotEnd = $this->normalizeTime($slot['endTime']);
+
+            if (! $availabilityStart || ! $availabilityEnd || ! $slotStart || ! $slotEnd) {
+                return false;
+            }
+
+            return $availabilityStart < $slotEnd && $availabilityEnd > $slotStart;
         });
     }
 

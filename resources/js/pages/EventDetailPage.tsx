@@ -1697,9 +1697,9 @@ export function EventDetailPage() {
                   <p className="mt-2 text-sm text-slate-500">作成した履歴を残せます</p>
                 </Card>
                 <Card className="bg-amber-50">
-                  <p className="text-sm text-amber-700">不足人数</p>
+                  <p className="text-sm text-amber-700">不足</p>
                   <p className="mt-2 text-3xl font-semibold text-slate-900">{shiftMetrics?.missingPeopleTotal ?? 0}人</p>
-                  <p className="mt-2 text-sm text-slate-500">{shiftWarnings.length}件の枠で不足があります</p>
+                  <p className="mt-2 text-sm text-slate-500">{shiftWarnings.length}件の確認があります</p>
                 </Card>
               </section>
 
@@ -1707,12 +1707,23 @@ export function EventDetailPage() {
                 <Card className="space-y-3 border-amber-200 bg-amber-50">
                   <h3 className="text-base font-semibold text-amber-800">不足警告</h3>
                   <div className="space-y-2">
-                    {shiftWarnings.map((warning) => (
-                      <div key={warning.slotId} className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
-                        {warning.date} {warning.startTime?.slice(0, 5)} - {warning.endTime?.slice(0, 5)}: {warning.message}
-                        <span className="ml-2 text-slate-500">
-                          {warning.assignedPeople}/{warning.requiredPeople}人
-                        </span>
+                    {shiftWarnings.map((warning, index) => (
+                      <div key={warning.slotId ?? `${warning.taskId ?? 'task'}-${index}`} className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
+                        {warning.date ? (
+                          <>
+                            {warning.date} {warning.startTime?.slice(0, 5)} - {warning.endTime?.slice(0, 5)}: {warning.message}
+                            <span className="ml-2 text-slate-500">
+                              {warning.assignedPeople}/{warning.requiredPeople}人
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {warning.message}
+                            {warning.missingMinutes ? (
+                              <span className="ml-2 text-slate-500">あと{Math.ceil(warning.missingMinutes / 60)}時間分</span>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>

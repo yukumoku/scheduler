@@ -23,6 +23,7 @@ class ShiftController extends Controller
         $shifts = $event->shifts()
             ->with([
                 'event.slots.task.team',
+                'event.tasks',
                 'event.commonAvailabilitySet.availabilities',
                 'assignments.user',
                 'assignments.eventSlot.task.team',
@@ -60,6 +61,7 @@ class ShiftController extends Controller
         $this->requireShiftManager(request(), $shift);
         $shift->load([
             'event.slots.task.team',
+            'event.tasks',
             'event.commonAvailabilitySet.availabilities',
             'assignments.user',
             'assignments.eventSlot.task.team',
@@ -83,6 +85,7 @@ class ShiftController extends Controller
 
         $shift->load([
             'event.slots.task.team',
+            'event.tasks',
             'event.commonAvailabilitySet.availabilities',
             'assignments.user',
             'assignments.eventSlot.task.team',
@@ -106,6 +109,7 @@ class ShiftController extends Controller
 
         $shift->load([
             'event.slots.task.team',
+            'event.tasks',
             'event.commonAvailabilitySet.availabilities',
             'assignments.user',
             'assignments.eventSlot.task.team',

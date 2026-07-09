@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Event;
 use App\Models\EventSlot;
 use App\Models\EventTask;
+use App\Models\CommonAvailabilitySet;
 use App\Models\GroupMember;
 use App\Models\ShiftGenerationSetting;
 use App\Models\ShiftRule;
@@ -71,6 +72,42 @@ class ShiftGenerationAlgorithmTest extends TestCase
         );
 
         $this->assertSame($freshUser->id, $selected[0]->id);
+    }
+
+    public function test_estimated_task_slots_follow_common_availability_activity_rules(): void
+    {
+        $event = new Event();
+        $set = new CommonAvailabilitySet();
+        $set->activity_rules = [
+            'weekly' => [
+                'mon' => ['enabled' => true, 'startTime' => '13:00', 'endTime' => '15:00'],
+                'tue' => ['enabled' => true, 'startTime' => '09:00', 'endTime' => '11:00'],
+            ],
+            'excludedDates' => ['2026-07-21'],
+            'specialDates' => [
+                ['date' => '2026-07-22', 'startTime' => '10:00', 'endTime' => '12:00', 'note' => null],
+            ],
+        ];
+        $event->setRelation('commonAvailabilitySet', $set);
+
+        $method = new \ReflectionMethod(ShiftGenerationService::class, 'activityWindowsForDates');
+        $method->setAccessible(true);
+
+        $windows = $method->invoke(
+            new ShiftGenerationService(),
+            $event,
+            [
+                Carbon::parse('2026-07-20'),
+                Carbon::parse('2026-07-21'),
+                Carbon::parse('2026-07-22'),
+            ],
+            60,
+        );
+
+        $this->assertSame(
+            ['2026-07-20 13:00', '2026-07-20 14:00', '2026-07-22 10:00', '2026-07-22 11:00'],
+            array_map(fn (array $window) => $window['start']->format('Y-m-d H:i'), $windows),
+        );
     }
 
     private function selectUsersForSlot(

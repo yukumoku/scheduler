@@ -110,11 +110,40 @@ class ShiftGenerationService
             }
         }
 
+        foreach ($event->tasks as $task) {
+            $desiredMinutes = (int) round(((float) ($task->desired_total_hours ?? 0)) * 60);
+            if ($desiredMinutes <= 0) {
+                continue;
+            }
+
+            $plannedMinutes = (int) $slots
+                ->where('task_id', $task->id)
+                ->sum(fn (EventSlot $slot) => $this->durationMinutes($slot));
+
+            if ($plannedMinutes < $desiredMinutes) {
+                $warnings[] = [
+                    'slotId' => null,
+                    'taskId' => $task->id,
+                    'date' => null,
+                    'startTime' => null,
+                    'endTime' => null,
+                    'requiredPeople' => 0,
+                    'assignedPeople' => 0,
+                    'missingPeople' => 0,
+                    'missingPeopleTotal' => 0,
+                    'missingMinutes' => $desiredMinutes - $plannedMinutes,
+                    'message' => '作業に必要な時間を確保できていません。',
+                ];
+            }
+        }
+
         $requiredPeopleTotal = $slots->sum('required_people');
         $assignedPeopleTotal = count($assignmentRecords);
         $missingPeopleTotal = max($requiredPeopleTotal - $assignedPeopleTotal, 0);
         $assignmentsBySlot = collect($assignmentRecords)->groupBy('slotId');
-        $plannedWorkMinutes = (int) $slots->sum(fn (EventSlot $slot) => $this->durationMinutes($slot));
+        $scheduledWorkMinutes = (int) $slots->sum(fn (EventSlot $slot) => $this->durationMinutes($slot));
+        $desiredWorkMinutes = (int) $event->tasks->sum(fn ($task) => (int) round(((float) ($task->desired_total_hours ?? 0)) * 60));
+        $plannedWorkMinutes = max($scheduledWorkMinutes, $desiredWorkMinutes);
         $completeWorkMinutes = (int) $slots->sum(function (EventSlot $slot) use ($assignmentsBySlot) {
             $assignedPeople = $assignmentsBySlot->get($slot->id, collect())->count();
 
@@ -578,12 +607,17 @@ class ShiftGenerationService
             return;
         }
 
+        $candidateWindows = $this->activityWindowsForDates($event, $dates, $slotMinutes);
+        if (! $candidateWindows) {
+            $event->slots()->where('task_id', $task->id)->delete();
+            return;
+        }
+
         $keepSlotIds = [];
-        for ($index = 0; $index < $slotCount; $index++) {
-            $date = $dates[$index % count($dates)];
-            $daySlotIndex = intdiv($index, count($dates));
-            $startAt = $date->copy()->setTime(9, 0)->addMinutes($daySlotIndex * $slotMinutes);
-            $endAt = $startAt->copy()->addMinutes($slotMinutes);
+        for ($index = 0; $index < min($slotCount, count($candidateWindows)); $index++) {
+            $window = $candidateWindows[$index];
+            $startAt = $window['start']->copy();
+            $endAt = $window['end']->copy();
 
             $slot = EventSlot::query()->updateOrCreate(
                 [
@@ -627,5 +661,57 @@ class ShiftGenerationService
         }
 
         return $dates;
+    }
+
+    /**
+     * @param array<int, Carbon> $dates
+     * @return array<int, array{start: Carbon, end: Carbon}>
+     */
+    private function activityWindowsForDates(Event $event, array $dates, int $slotMinutes): array
+    {
+        $rules = is_array($event->commonAvailabilitySet?->activity_rules ?? null)
+            ? $event->commonAvailabilitySet->activity_rules
+            : [];
+        $weekly = is_array($rules['weekly'] ?? null) ? $rules['weekly'] : [];
+        $excludedDates = collect($rules['excludedDates'] ?? [])
+            ->filter(fn ($date) => is_string($date) && $date !== '')
+            ->map(fn (string $date) => Carbon::parse($date)->toDateString())
+            ->all();
+        $specialDates = collect($rules['specialDates'] ?? [])
+            ->filter(fn ($item) => is_array($item) && ! empty($item['date']) && ! empty($item['startTime']) && ! empty($item['endTime']))
+            ->keyBy(fn (array $item) => Carbon::parse($item['date'])->toDateString());
+
+        $windows = [];
+        foreach ($dates as $date) {
+            $dateString = $date->toDateString();
+            if (in_array($dateString, $excludedDates, true)) {
+                continue;
+            }
+
+            $specialDate = $specialDates->get($dateString);
+            $weekdayRule = $weekly[strtolower($date->format('D'))] ?? null;
+            $enabled = $specialDate !== null || (bool) ($weekdayRule['enabled'] ?? true);
+            if (! $enabled) {
+                continue;
+            }
+
+            $startTime = $specialDate['startTime'] ?? ($weekdayRule['startTime'] ?? '09:00');
+            $endTime = $specialDate['endTime'] ?? ($weekdayRule['endTime'] ?? '12:00');
+            $start = Carbon::parse($dateString.' '.$this->normalizeTime($startTime));
+            $end = Carbon::parse($dateString.' '.$this->normalizeTime($endTime));
+
+            if ($start->greaterThanOrEqualTo($end) || $start->copy()->addMinutes($slotMinutes)->greaterThan($end)) {
+                continue;
+            }
+
+            for ($cursor = $start->copy(); $cursor->copy()->addMinutes($slotMinutes)->lessThanOrEqualTo($end); $cursor->addMinutes($slotMinutes)) {
+                $windows[] = [
+                    'start' => $cursor->copy(),
+                    'end' => $cursor->copy()->addMinutes($slotMinutes),
+                ];
+            }
+        }
+
+        return $windows;
     }
 }

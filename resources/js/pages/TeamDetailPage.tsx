@@ -392,6 +392,7 @@ export function TeamDetailPage() {
   const groupMembers = groupMembersQuery.data ?? []
   const selectedWorkPeriod = availabilitySets.find((set) => set.id === selectedWorkPeriodId) ?? null
   const taskRequiredMemberIds = taskForm.watch('requiredMemberIds') ?? []
+  const taskDesiredTotalHours = taskForm.watch('desiredTotalHours')
   const taskRequiredMembers = useMemo(
     () =>
       taskRequiredMemberIds
@@ -409,6 +410,14 @@ export function TeamDetailPage() {
         ? updateTaskMutation.error.message
       : null
   const invalidDesiredPeriod = desiredPeriods.find((period) => period.date && period.startTime && period.endTime && period.startTime >= period.endTime)
+  const partialDesiredPeriod = desiredPeriods.find(
+    (period) => Boolean(period.date || period.location || period.note) && !(period.date && period.startTime && period.endTime),
+  )
+  const completeDesiredPeriodCount = desiredPeriods.filter((period) => period.date && period.startTime && period.endTime).length
+  const taskPlanError =
+    !taskDesiredTotalHours && completeDesiredPeriodCount === 0
+      ? '作業に必要な時間を入力してください。日時が決まっている作業は、日時候補を追加してください。'
+      : null
 
   return (
     <div className="space-y-4">
@@ -926,6 +935,9 @@ export function TeamDetailPage() {
               <span className="text-sm font-medium text-slate-700">合計で必要な作業時間</span>
               <Input type="number" min={0.5} step="0.5" {...taskForm.register('desiredTotalHours')} placeholder="例: 4" />
               <p className="text-xs leading-6 text-slate-500">作業そのものに必要な時間です。2人で1時間入っても、ここでは1時間として扱います。</p>
+              {taskForm.formState.errors.desiredTotalHours ? (
+                <p className="text-sm text-rose-600">{taskForm.formState.errors.desiredTotalHours.message}</p>
+              ) : null}
             </label>
           </div>
 
@@ -1068,6 +1080,8 @@ export function TeamDetailPage() {
 
           {taskMutationError ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{taskMutationError}</p> : null}
           {invalidDesiredPeriod ? <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">入力された時間の中に、終わりが先になっているものがあります。</p> : null}
+          {partialDesiredPeriod ? <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">日時候補は、日付・開始・終了をすべて入れてください。</p> : null}
+          {taskPlanError ? <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">{taskPlanError}</p> : null}
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button
@@ -1098,7 +1112,9 @@ export function TeamDetailPage() {
               disabled={
                 createTaskMutation.isPending ||
                 updateTaskMutation.isPending ||
-                Boolean(invalidDesiredPeriod)
+                Boolean(invalidDesiredPeriod) ||
+                Boolean(partialDesiredPeriod) ||
+                Boolean(taskPlanError)
               }
             >
               {editingTask ? '保存' : '作成'}

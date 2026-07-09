@@ -16,7 +16,7 @@ class ShiftResource extends JsonResource
             ? $event->slots
             : $assignments->map(fn ($assignment) => $assignment->eventSlot)->filter()->unique('id')->values();
         $metrics = $this->buildMetrics($slots, $assignments, $event);
-        $warnings = $this->buildWarnings($slots, $assignments);
+        $warnings = $this->buildWarnings($slots, $assignments, $event);
 
         return [
             'id' => $this->id,
@@ -38,7 +38,7 @@ class ShiftResource extends JsonResource
         ];
     }
 
-    private function buildWarnings($slots, $assignments): array
+    private function buildWarnings($slots, $assignments, $event): array
     {
         return $slots
             ->map(function ($slot) use ($assignments) {
@@ -63,7 +63,46 @@ class ShiftResource extends JsonResource
             })
             ->filter()
             ->values()
+            ->merge($this->buildTaskPlanWarnings($slots, $event))
             ->all();
+    }
+
+    private function buildTaskPlanWarnings($slots, $event)
+    {
+        if (! $event || ! method_exists($event, 'relationLoaded') || ! $event->relationLoaded('tasks')) {
+            return collect();
+        }
+
+        return $event->tasks
+            ->map(function ($task) use ($slots) {
+                $desiredMinutes = (int) round(((float) ($task->desired_total_hours ?? 0)) * 60);
+                if ($desiredMinutes <= 0) {
+                    return null;
+                }
+
+                $plannedMinutes = (int) $slots
+                    ->where('task_id', $task->id)
+                    ->sum(fn ($slot) => $this->durationMinutes($slot));
+
+                if ($plannedMinutes >= $desiredMinutes) {
+                    return null;
+                }
+
+                return [
+                    'slotId' => null,
+                    'taskId' => $task->id,
+                    'date' => null,
+                    'startTime' => null,
+                    'endTime' => null,
+                    'requiredPeople' => 0,
+                    'assignedPeople' => 0,
+                    'missingPeople' => 0,
+                    'missingMinutes' => $desiredMinutes - $plannedMinutes,
+                    'message' => '作業に必要な時間を確保できていません。',
+                ];
+            })
+            ->filter()
+            ->values();
     }
 
     private function buildMetrics($slots, $assignments, $event): array
@@ -71,7 +110,13 @@ class ShiftResource extends JsonResource
         $requiredPeopleTotal = (int) $slots->sum('required_people');
         $assignedPeopleTotal = $assignments->count();
         $missingPeopleTotal = max($requiredPeopleTotal - $assignedPeopleTotal, 0);
-        $plannedWorkMinutes = (int) $slots->sum(fn ($slot) => $this->durationMinutes($slot));
+        $scheduledWorkMinutes = (int) $slots->sum(fn ($slot) => $this->durationMinutes($slot));
+        $desiredWorkMinutes = $event
+            && method_exists($event, 'relationLoaded')
+            && $event->relationLoaded('tasks')
+            ? (int) $event->tasks->sum(fn ($task) => (int) round(((float) ($task->desired_total_hours ?? 0)) * 60))
+            : 0;
+        $plannedWorkMinutes = max($scheduledWorkMinutes, $desiredWorkMinutes);
         $completeWorkMinutes = (int) $slots->sum(function ($slot) use ($assignments) {
             $assignedPeople = $assignments->where('event_slot_id', $slot->id)->count();
 
