@@ -227,6 +227,25 @@ class ShiftGenerationAlgorithmTest extends TestCase
         $this->assertSame($user->id, $selected[0]['users'][0]->id);
     }
 
+    public function test_candidate_windows_are_limited_for_long_periods(): void
+    {
+        $windows = collect(range(0, 499))
+            ->map(fn (int $index) => [
+                'start' => Carbon::parse('2026-07-20 09:00:00')->addHours($index),
+                'end' => Carbon::parse('2026-07-20 10:00:00')->addHours($index),
+            ])
+            ->all();
+
+        $method = new \ReflectionMethod(ShiftGenerationService::class, 'limitCandidateWindows');
+        $method->setAccessible(true);
+
+        $limited = $method->invoke(new ShiftGenerationService(), $windows);
+
+        $this->assertLessThanOrEqual(240, count($limited));
+        $this->assertSame('2026-07-20 09:00', $limited[0]['start']->format('Y-m-d H:i'));
+        $this->assertSame($windows[array_key_last($windows)]['start']->format('Y-m-d H:i'), $limited[array_key_last($limited)]['start']->format('Y-m-d H:i'));
+    }
+
     private function selectUsersForSlot(
         EventSlot $slot,
         array $users,

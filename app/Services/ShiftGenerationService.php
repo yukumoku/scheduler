@@ -16,6 +16,10 @@ use Illuminate\Support\Str;
 
 class ShiftGenerationService
 {
+    private const MAX_WINDOWS_PER_TASK = 240;
+    private const WINDOW_SEARCH_RADIUS = 18;
+    private const GENERATION_SOFT_LIMIT_SECONDS = 24;
+
     /**
      * @return array{shift: Shift, warnings: array<int, array<string, mixed>>}
      */
@@ -24,6 +28,7 @@ class ShiftGenerationService
         $event->loadMissing('group', 'commonAvailabilitySet', 'teams.members.user', 'tasks.team.members.user', 'slots.task.team', 'shiftRule', 'shiftGenerationSetting');
         $shiftRule = $this->resolveShiftRule($event);
         $generationSetting = $this->resolveGenerationSetting($event);
+        $startedAt = microtime(true);
         $availabilities = $event->commonAvailabilitySet
             ? $event->commonAvailabilitySet->availabilities()->with('user')->get()
             : collect();
@@ -58,6 +63,22 @@ class ShiftGenerationService
             $slotStart = $slot->start_datetime ? Carbon::parse($slot->start_datetime) : Carbon::parse($slot->date?->toDateString().' '.$slot->start_time);
             $slotEnd = $slot->end_datetime ? Carbon::parse($slot->end_datetime) : Carbon::parse($slot->date?->toDateString().' '.$slot->end_time);
             $slotDuration = max($slotStart->diffInMinutes($slotEnd), 0);
+            if ($this->reachedSoftLimit($startedAt)) {
+                $warnings[] = [
+                    'slotId' => $slot->id,
+                    'taskId' => $slot->task_id,
+                    'date' => $slot->date?->toDateString(),
+                    'startTime' => $slot->start_time,
+                    'endTime' => $slot->end_time,
+                    'requiredPeople' => $slot->required_people,
+                    'assignedPeople' => 0,
+                    'missingPeople' => $slot->required_people,
+                    'missingPeopleTotal' => $slot->required_people,
+                    'message' => '作成時間の上限に近づいたため、この枠以降は未割り当てです。',
+                ];
+                continue;
+            }
+
             $assignedUsers = $this->selectUsersForSlot(
                 event: $event,
                 slot: $slot,
@@ -233,6 +254,11 @@ class ShiftGenerationService
     private function initializeSlotMemory(Collection $groupMembers): array
     {
         return $groupMembers->mapWithKeys(fn ($member) => [$member->user_id => null])->all();
+    }
+
+    private function reachedSoftLimit(float $startedAt): bool
+    {
+        return microtime(true) - $startedAt >= self::GENERATION_SOFT_LIMIT_SECONDS;
     }
 
     private function initializeAssignedIntervals(Collection $groupMembers): array
@@ -717,6 +743,7 @@ class ShiftGenerationService
             $event->slots()->where('task_id', $task->id)->whereDoesntHave('assignments')->delete();
             return [];
         }
+        $candidateWindows = $this->limitCandidateWindows($candidateWindows);
 
         $selectedWindows = $this->selectAvailabilityFirstWindows(
             event: $event,
@@ -803,11 +830,12 @@ class ShiftGenerationService
         foreach ($targetIndexes as $targetIndex) {
             $best = null;
 
-            foreach ($windows as $windowIndex => $window) {
+            foreach ($this->candidateIndexesAroundTarget($windowCount, $targetIndex, self::WINDOW_SEARCH_RADIUS) as $windowIndex) {
                 if (isset($usedIndexes[$windowIndex])) {
                     continue;
                 }
 
+                $window = $windows[$windowIndex];
                 $planningSlot = $this->makePlanningSlot($event, $task, $window, $requiredPeople);
                 $workloadCopy = $plannedWorkload;
                 $lastAssignedEndAtCopy = $plannedLastAssignedEndAt;
@@ -868,6 +896,46 @@ class ShiftGenerationService
         usort($selected, fn (array $left, array $right) => $left['window']['start']->getTimestamp() <=> $right['window']['start']->getTimestamp());
 
         return $selected;
+    }
+
+    /**
+     * @param array<int, array{start: Carbon, end: Carbon}> $windows
+     * @return array<int, array{start: Carbon, end: Carbon}>
+     */
+    private function limitCandidateWindows(array $windows): array
+    {
+        $windowCount = count($windows);
+        if ($windowCount <= self::MAX_WINDOWS_PER_TASK) {
+            return $windows;
+        }
+
+        return $this->selectDistributedWindows($windows, self::MAX_WINDOWS_PER_TASK);
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function candidateIndexesAroundTarget(int $windowCount, int $targetIndex, int $radius): array
+    {
+        if ($windowCount <= 0) {
+            return [];
+        }
+
+        $indexes = [$targetIndex];
+        for ($distance = 1; $distance <= $radius; $distance++) {
+            $left = $targetIndex - $distance;
+            $right = $targetIndex + $distance;
+
+            if ($left >= 0) {
+                $indexes[] = $left;
+            }
+
+            if ($right < $windowCount) {
+                $indexes[] = $right;
+            }
+        }
+
+        return array_values(array_unique($indexes));
     }
 
     /**
