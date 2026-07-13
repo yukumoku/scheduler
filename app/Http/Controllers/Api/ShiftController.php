@@ -44,6 +44,8 @@ class ShiftController extends Controller
     public function generate(ShiftGenerateRequest $request, Event $event): JsonResponse
     {
         $this->requireEventManager($request, $event);
+        $this->extendShiftGenerationRuntime();
+
         try {
             $result = $this->shiftGenerationService->generate($event);
         } catch (Throwable $exception) {
@@ -71,6 +73,12 @@ class ShiftController extends Controller
             ],
             'error' => null,
         ], 201);
+    }
+
+    private function extendShiftGenerationRuntime(): void
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
     }
 
     public function show(Shift $shift): JsonResponse

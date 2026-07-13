@@ -18,7 +18,7 @@ class ShiftGenerationService
 {
     private const MAX_WINDOWS_PER_TASK = 240;
     private const WINDOW_SEARCH_RADIUS = 18;
-    private const GENERATION_SOFT_LIMIT_SECONDS = 24;
+    private const GENERATION_SOFT_LIMIT_SECONDS = 165;
 
     /**
      * @return array{shift: Shift, warnings: array<int, array<string, mixed>>}
