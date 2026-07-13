@@ -24,14 +24,14 @@ class ShiftGenerationService
         $event->loadMissing('group', 'commonAvailabilitySet', 'teams.members.user', 'tasks.team.members.user', 'slots.task.team', 'shiftRule', 'shiftGenerationSetting');
         $shiftRule = $this->resolveShiftRule($event);
         $generationSetting = $this->resolveGenerationSetting($event);
-        $this->syncTaskPlanSlots($event, $shiftRule);
-
-        $slots = $event->slots()->with('task.team.members.user')->orderBy('start_datetime')->get();
         $availabilities = $event->commonAvailabilitySet
             ? $event->commonAvailabilitySet->availabilities()->with('user')->get()
             : collect();
         $groupMembers = $event->group->members()->with('user')->get();
         $teamMemberByUserId = $this->buildTeamMembershipLookup($event);
+        $this->syncTaskPlanSlots($event, $shiftRule, $generationSetting, $groupMembers, $availabilities, $teamMemberByUserId);
+
+        $slots = $event->slots()->with('task.team.members.user')->orderBy('start_datetime')->get();
         $workload = $this->initializeWorkload($groupMembers);
         $lastAssignedEndAt = $this->initializeSlotMemory($groupMembers);
         $continuousMinutes = $this->initializeSlotMemory($groupMembers);
@@ -96,19 +96,15 @@ class ShiftGenerationService
                     'is_leader' => $isLeader,
                 ]);
 
-                $workload[$user->id] = ($workload[$user->id] ?? 0) + $this->durationMinutes($slot);
-                $previousEndAt = $lastAssignedEndAt[$user->id] ?? null;
-                $gapMinutes = $previousEndAt instanceof Carbon ? $previousEndAt->diffInMinutes($slotStart, false) : null;
-                $hasEnoughBreak = $gapMinutes !== null && $gapMinutes > 0 && ((int) $shiftRule->break_minutes === 0 || $gapMinutes >= $shiftRule->break_minutes);
-                $lastAssignedEndAt[$user->id] = $slotEnd->copy();
-                $continuousMinutes[$user->id] = $hasEnoughBreak
-                    ? $slotDuration
-                    : (($continuousMinutes[$user->id] ?? 0) + $slotDuration);
-                $assignedIntervalsByUser[$user->id][] = [
-                    'start' => $slotStart->copy(),
-                    'end' => $slotEnd->copy(),
-                    'slotId' => $slot->id,
-                ];
+                $this->reserveUsersForSlot(
+                    users: collect([$user]),
+                    slot: $slot,
+                    workload: $workload,
+                    lastAssignedEndAt: $lastAssignedEndAt,
+                    continuousMinutes: $continuousMinutes,
+                    assignedIntervalsByUser: $assignedIntervalsByUser,
+                    shiftRule: $shiftRule,
+                );
                 $assignmentRecords[] = [
                     'slotId' => $slot->id,
                     'userId' => $user->id,
@@ -566,12 +562,36 @@ class ShiftGenerationService
         return is_string($status) ? $status : null;
     }
 
-    private function syncTaskPlanSlots(Event $event, ShiftRule $shiftRule): void
+    private function syncTaskPlanSlots(
+        Event $event,
+        ShiftRule $shiftRule,
+        ShiftGenerationSetting $generationSetting,
+        Collection $groupMembers,
+        Collection $availabilities,
+        array $teamMemberByUserId,
+    ): void
     {
-        foreach ($event->tasks as $task) {
+        $plannedWorkload = $this->initializeWorkload($groupMembers);
+        $plannedLastAssignedEndAt = $this->initializeSlotMemory($groupMembers);
+        $plannedContinuousMinutes = $this->initializeSlotMemory($groupMembers);
+        $plannedIntervalsByUser = $this->initializeAssignedIntervals($groupMembers);
+
+        foreach ($event->tasks->sortBy([['sort_order', 'asc'], ['name', 'asc']]) as $task) {
             $desiredPeriods = is_array($task->desired_periods ?? null) ? $task->desired_periods : [];
             if (! $desiredPeriods) {
-                $this->syncEstimatedTaskSlots($event, $task, $shiftRule);
+                $this->syncEstimatedTaskSlots(
+                    event: $event,
+                    task: $task,
+                    shiftRule: $shiftRule,
+                    generationSetting: $generationSetting,
+                    groupMembers: $groupMembers,
+                    availabilities: $availabilities,
+                    teamMemberByUserId: $teamMemberByUserId,
+                    plannedWorkload: $plannedWorkload,
+                    plannedLastAssignedEndAt: $plannedLastAssignedEndAt,
+                    plannedContinuousMinutes: $plannedContinuousMinutes,
+                    plannedIntervalsByUser: $plannedIntervalsByUser,
+                );
                 continue;
             }
 
@@ -603,6 +623,30 @@ class ShiftGenerationService
                 );
 
                 $keepSlotIds[] = $slot->id;
+
+                $slot->setRelation('task', $task);
+                $plannedUsers = $this->selectUsersForSlot(
+                    event: $event,
+                    slot: $slot,
+                    groupMembers: $groupMembers,
+                    availabilities: $availabilities,
+                    teamMemberByUserId: $teamMemberByUserId,
+                    workload: $plannedWorkload,
+                    lastAssignedEndAt: $plannedLastAssignedEndAt,
+                    continuousMinutes: $plannedContinuousMinutes,
+                    assignedIntervalsByUser: $plannedIntervalsByUser,
+                    shiftRule: $shiftRule,
+                    generationSetting: $generationSetting,
+                );
+                $this->reserveUsersForSlot(
+                    users: collect($plannedUsers),
+                    slot: $slot,
+                    workload: $plannedWorkload,
+                    lastAssignedEndAt: $plannedLastAssignedEndAt,
+                    continuousMinutes: $plannedContinuousMinutes,
+                    assignedIntervalsByUser: $plannedIntervalsByUser,
+                    shiftRule: $shiftRule,
+                );
             }
 
             $event->slots()
@@ -612,7 +656,19 @@ class ShiftGenerationService
         }
     }
 
-    private function syncEstimatedTaskSlots(Event $event, object $task, ShiftRule $shiftRule): void
+    private function syncEstimatedTaskSlots(
+        Event $event,
+        object $task,
+        ShiftRule $shiftRule,
+        ShiftGenerationSetting $generationSetting,
+        Collection $groupMembers,
+        Collection $availabilities,
+        array $teamMemberByUserId,
+        array &$plannedWorkload,
+        array &$plannedLastAssignedEndAt,
+        array &$plannedContinuousMinutes,
+        array &$plannedIntervalsByUser,
+    ): void
     {
         $desiredTotalMinutes = (int) round(((float) ($task->desired_total_hours ?? 0)) * 60);
         if ($desiredTotalMinutes <= 0) {
@@ -648,9 +704,26 @@ class ShiftGenerationService
             return;
         }
 
+        $selectedWindows = $this->selectAvailabilityFirstWindows(
+            event: $event,
+            task: $task,
+            windows: $candidateWindows,
+            slotCount: $slotCount,
+            requiredPeople: $requiredPeople,
+            groupMembers: $groupMembers,
+            availabilities: $availabilities,
+            teamMemberByUserId: $teamMemberByUserId,
+            plannedWorkload: $plannedWorkload,
+            plannedLastAssignedEndAt: $plannedLastAssignedEndAt,
+            plannedContinuousMinutes: $plannedContinuousMinutes,
+            plannedIntervalsByUser: $plannedIntervalsByUser,
+            shiftRule: $shiftRule,
+            generationSetting: $generationSetting,
+        );
+
         $keepSlotIds = [];
-        for ($index = 0; $index < min($slotCount, count($candidateWindows)); $index++) {
-            $window = $candidateWindows[$index];
+        foreach ($selectedWindows as $selection) {
+            $window = $selection['window'];
             $startAt = $window['start']->copy();
             $endAt = $window['end']->copy();
 
@@ -679,6 +752,209 @@ class ShiftGenerationService
             ->where('task_id', $task->id)
             ->whereNotIn('id', $keepSlotIds)
             ->delete();
+    }
+
+    /**
+     * @param array<int, array{start: Carbon, end: Carbon}> $windows
+     * @return array<int, array{window: array{start: Carbon, end: Carbon}, users: array<int, User>}>
+     */
+    private function selectAvailabilityFirstWindows(
+        Event $event,
+        object $task,
+        array $windows,
+        int $slotCount,
+        int $requiredPeople,
+        Collection $groupMembers,
+        Collection $availabilities,
+        array $teamMemberByUserId,
+        array &$plannedWorkload,
+        array &$plannedLastAssignedEndAt,
+        array &$plannedContinuousMinutes,
+        array &$plannedIntervalsByUser,
+        ShiftRule $shiftRule,
+        ShiftGenerationSetting $generationSetting,
+    ): array {
+        $windowCount = count($windows);
+        if ($windowCount === 0 || $slotCount <= 0) {
+            return [];
+        }
+
+        $selected = [];
+        $usedIndexes = [];
+        $targetIndexes = $this->distributedTargetIndexes($windowCount, min($slotCount, $windowCount));
+
+        foreach ($targetIndexes as $targetIndex) {
+            $best = null;
+
+            foreach ($windows as $windowIndex => $window) {
+                if (isset($usedIndexes[$windowIndex])) {
+                    continue;
+                }
+
+                $planningSlot = $this->makePlanningSlot($event, $task, $window, $requiredPeople);
+                $workloadCopy = $plannedWorkload;
+                $lastAssignedEndAtCopy = $plannedLastAssignedEndAt;
+                $continuousMinutesCopy = $plannedContinuousMinutes;
+                $intervalsCopy = $plannedIntervalsByUser;
+                $users = $this->selectUsersForSlot(
+                    event: $event,
+                    slot: $planningSlot,
+                    groupMembers: $groupMembers,
+                    availabilities: $availabilities,
+                    teamMemberByUserId: $teamMemberByUserId,
+                    workload: $workloadCopy,
+                    lastAssignedEndAt: $lastAssignedEndAtCopy,
+                    continuousMinutes: $continuousMinutesCopy,
+                    assignedIntervalsByUser: $intervalsCopy,
+                    shiftRule: $shiftRule,
+                    generationSetting: $generationSetting,
+                );
+
+                $assignedCount = count($users);
+                $distance = abs($windowIndex - $targetIndex);
+                $score = ($assignedCount * 1_000_000)
+                    - ($assignedCount >= $requiredPeople ? 0 : 250_000)
+                    - ($distance * 1_000)
+                    - $windowIndex;
+
+                if ($best === null || $score > $best['score']) {
+                    $best = [
+                        'index' => $windowIndex,
+                        'window' => $window,
+                        'users' => $users,
+                        'score' => $score,
+                    ];
+                }
+            }
+
+            if ($best === null) {
+                continue;
+            }
+
+            $usedIndexes[$best['index']] = true;
+            $planningSlot = $this->makePlanningSlot($event, $task, $best['window'], $requiredPeople);
+            $this->reserveUsersForSlot(
+                users: collect($best['users']),
+                slot: $planningSlot,
+                workload: $plannedWorkload,
+                lastAssignedEndAt: $plannedLastAssignedEndAt,
+                continuousMinutes: $plannedContinuousMinutes,
+                assignedIntervalsByUser: $plannedIntervalsByUser,
+                shiftRule: $shiftRule,
+            );
+            $selected[] = [
+                'window' => $best['window'],
+                'users' => $best['users'],
+            ];
+        }
+
+        usort($selected, fn (array $left, array $right) => $left['window']['start']->getTimestamp() <=> $right['window']['start']->getTimestamp());
+
+        return $selected;
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function distributedTargetIndexes(int $windowCount, int $slotCount): array
+    {
+        if ($windowCount <= 0 || $slotCount <= 0) {
+            return [];
+        }
+
+        if ($slotCount >= $windowCount) {
+            return range(0, $windowCount - 1);
+        }
+
+        if ($slotCount === 1) {
+            return [(int) floor(($windowCount - 1) / 2)];
+        }
+
+        $indexes = [];
+        $used = [];
+        $lastIndex = $windowCount - 1;
+        $lastSlot = $slotCount - 1;
+
+        for ($index = 0; $index < $slotCount; $index++) {
+            $candidateIndex = (int) round(($index * $lastIndex) / $lastSlot);
+
+            while (isset($used[$candidateIndex]) && $candidateIndex < $lastIndex) {
+                $candidateIndex++;
+            }
+
+            while (isset($used[$candidateIndex]) && $candidateIndex > 0) {
+                $candidateIndex--;
+            }
+
+            $used[$candidateIndex] = true;
+            $indexes[] = $candidateIndex;
+        }
+
+        sort($indexes);
+
+        return $indexes;
+    }
+
+    /**
+     * @param array{start: Carbon, end: Carbon} $window
+     */
+    private function makePlanningSlot(Event $event, object $task, array $window, int $requiredPeople): EventSlot
+    {
+        $startAt = $window['start']->copy();
+        $endAt = $window['end']->copy();
+        $slot = new EventSlot();
+        $slot->id = 'planning-'.$task->id.'-'.$startAt->format('YmdHi');
+        $slot->event_id = $event->id;
+        $slot->task_id = $task->id;
+        $slot->date = $startAt->copy()->startOfDay();
+        $slot->start_time = $startAt->format('H:i:s');
+        $slot->end_time = $endAt->format('H:i:s');
+        $slot->start_datetime = $startAt;
+        $slot->end_datetime = $endAt;
+        $slot->required_people = $requiredPeople;
+        $slot->status = 'open';
+        $slot->setRelation('task', $task);
+
+        return $slot;
+    }
+
+    private function reserveUsersForSlot(
+        Collection $users,
+        EventSlot $slot,
+        array &$workload,
+        array &$lastAssignedEndAt,
+        array &$continuousMinutes,
+        array &$assignedIntervalsByUser,
+        ShiftRule $shiftRule,
+    ): void {
+        $slotStart = $slot->start_datetime ? Carbon::parse($slot->start_datetime) : Carbon::parse($slot->date?->toDateString().' '.$slot->start_time);
+        $slotEnd = $slot->end_datetime ? Carbon::parse($slot->end_datetime) : Carbon::parse($slot->date?->toDateString().' '.$slot->end_time);
+        $slotDuration = max($slotStart->diffInMinutes($slotEnd), 0);
+
+        foreach ($users as $user) {
+            $workload[$user->id] = ($workload[$user->id] ?? 0) + $slotDuration;
+            $previousEndAt = $lastAssignedEndAt[$user->id] ?? null;
+            $gapMinutes = $previousEndAt instanceof Carbon ? $previousEndAt->diffInMinutes($slotStart, false) : null;
+            $hasEnoughBreak = $gapMinutes !== null && $gapMinutes > 0 && ((int) $shiftRule->break_minutes === 0 || $gapMinutes >= $shiftRule->break_minutes);
+            $lastAssignedEndAt[$user->id] = $slotEnd->copy();
+            $continuousMinutes[$user->id] = $hasEnoughBreak
+                ? $slotDuration
+                : (($continuousMinutes[$user->id] ?? 0) + $slotDuration);
+            $assignedIntervalsByUser[$user->id][] = [
+                'start' => $slotStart->copy(),
+                'end' => $slotEnd->copy(),
+                'slotId' => $slot->id,
+            ];
+        }
+    }
+
+    /**
+     * @param array<int, array{start: Carbon, end: Carbon}> $windows
+     * @return array<int, array{start: Carbon, end: Carbon}>
+     */
+    private function selectDistributedWindows(array $windows, int $slotCount): array
+    {
+        return array_map(fn (int $index) => $windows[$index], $this->distributedTargetIndexes(count($windows), $slotCount));
     }
 
     /**

@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AvailabilityStatus;
 use App\Models\Event;
 use App\Models\EventSlot;
 use App\Models\EventTask;
 use App\Models\CommonAvailabilitySet;
+use App\Models\CommonAvailability;
 use App\Models\GroupMember;
 use App\Models\ShiftGenerationSetting;
 use App\Models\ShiftRule;
@@ -140,6 +142,89 @@ class ShiftGenerationAlgorithmTest extends TestCase
             ['2026-07-20 13:00', '2026-07-20 14:00', '2026-07-22 10:00', '2026-07-22 11:00'],
             array_map(fn (array $window) => $window['start']->format('Y-m-d H:i'), $windows),
         );
+    }
+
+    public function test_estimated_task_slots_are_distributed_across_whole_period(): void
+    {
+        $windows = collect(range(0, 4))
+            ->map(fn (int $index) => [
+                'start' => Carbon::parse('2026-07-20 09:00:00')->addDays($index),
+                'end' => Carbon::parse('2026-07-20 10:00:00')->addDays($index),
+            ])
+            ->all();
+
+        $method = new \ReflectionMethod(ShiftGenerationService::class, 'selectDistributedWindows');
+        $method->setAccessible(true);
+
+        $selected = $method->invoke(new ShiftGenerationService(), $windows, 3);
+
+        $this->assertSame(
+            ['2026-07-20 09:00', '2026-07-22 09:00', '2026-07-24 09:00'],
+            array_map(fn (array $window) => $window['start']->format('Y-m-d H:i'), $selected),
+        );
+    }
+
+    public function test_availability_first_window_selection_prefers_times_with_available_members(): void
+    {
+        $user = $this->user('user-available', '来られる人');
+        $event = new Event();
+        $event->id = 'event-1';
+        $task = new EventTask();
+        $task->id = 'task-1';
+        $task->event_id = $event->id;
+        $task->team_id = null;
+        $task->required_member_ids = [];
+        $task->required_role = null;
+        $task->allow_cross_team_help = true;
+
+        $member = new GroupMember();
+        $member->user_id = $user->id;
+        $member->setRelation('user', $user);
+
+        $availability = new CommonAvailability();
+        $availability->user_id = $user->id;
+        $availability->date = Carbon::parse('2026-07-22');
+        $availability->start_time = '09:00:00';
+        $availability->end_time = '10:00:00';
+        $availability->status = AvailabilityStatus::Available;
+
+        $plannedWorkload = [$user->id => 0];
+        $plannedLastAssignedEndAt = [$user->id => null];
+        $plannedContinuousMinutes = [$user->id => 0];
+        $plannedIntervalsByUser = [$user->id => []];
+        $windows = [
+            [
+                'start' => Carbon::parse('2026-07-20 09:00:00'),
+                'end' => Carbon::parse('2026-07-20 10:00:00'),
+            ],
+            [
+                'start' => Carbon::parse('2026-07-22 09:00:00'),
+                'end' => Carbon::parse('2026-07-22 10:00:00'),
+            ],
+        ];
+
+        $method = new \ReflectionMethod(ShiftGenerationService::class, 'selectAvailabilityFirstWindows');
+        $method->setAccessible(true);
+
+        $selected = $method->invokeArgs(new ShiftGenerationService(), [
+            $event,
+            $task,
+            $windows,
+            1,
+            1,
+            collect([$member]),
+            collect([$availability]),
+            [$user->id => ['teams' => [], 'isLeader' => false]],
+            &$plannedWorkload,
+            &$plannedLastAssignedEndAt,
+            &$plannedContinuousMinutes,
+            &$plannedIntervalsByUser,
+            $this->shiftRule(),
+            $this->generationSetting(),
+        ]);
+
+        $this->assertSame('2026-07-22 09:00', $selected[0]['window']['start']->format('Y-m-d H:i'));
+        $this->assertSame($user->id, $selected[0]['users'][0]->id);
     }
 
     private function selectUsersForSlot(
