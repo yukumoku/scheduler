@@ -45,12 +45,16 @@ class ShiftController extends Controller
     {
         $this->requireEventManager($request, $event);
         $this->extendShiftGenerationRuntime();
+        $startedAt = microtime(true);
+
+        logger()->info('Shift generation started', [
+            'user_id' => $request->user()?->id,
+        ]);
 
         try {
             $result = $this->shiftGenerationService->generate($event);
         } catch (Throwable $exception) {
             logger()->error('Shift generation failed', [
-                'event_id' => $event->id,
                 'user_id' => $request->user()?->id,
                 'message' => $exception->getMessage(),
                 'file' => $exception->getFile(),
@@ -63,6 +67,14 @@ class ShiftController extends Controller
                 'error' => 'シフト作成に失敗しました。作業・参加確認・期間設定を確認してください。',
             ], 500);
         }
+
+        logger()->info('Shift generation completed', [
+            'user_id' => $request->user()?->id,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            'total_slots' => $result['metrics']['totalSlots'] ?? null,
+            'assigned_people' => $result['metrics']['assignedPeopleTotal'] ?? null,
+            'missing_people' => $result['metrics']['missingPeopleTotal'] ?? null,
+        ]);
 
         return response()->json([
             'success' => true,
