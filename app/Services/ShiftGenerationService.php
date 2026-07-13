@@ -29,9 +29,15 @@ class ShiftGenerationService
             : collect();
         $groupMembers = $event->group->members()->with('user')->get();
         $teamMemberByUserId = $this->buildTeamMembershipLookup($event);
-        $this->syncTaskPlanSlots($event, $shiftRule, $generationSetting, $groupMembers, $availabilities, $teamMemberByUserId);
+        $activeSlotIds = $this->syncTaskPlanSlots($event, $shiftRule, $generationSetting, $groupMembers, $availabilities, $teamMemberByUserId);
 
-        $slots = $event->slots()->with('task.team.members.user')->orderBy('start_datetime')->get();
+        $slots = $activeSlotIds
+            ? $event->slots()
+                ->with('task.team.members.user')
+                ->whereIn('id', $activeSlotIds)
+                ->orderBy('start_datetime')
+                ->get()
+            : collect();
         $workload = $this->initializeWorkload($groupMembers);
         $lastAssignedEndAt = $this->initializeSlotMemory($groupMembers);
         $continuousMinutes = $this->initializeSlotMemory($groupMembers);
@@ -569,8 +575,9 @@ class ShiftGenerationService
         Collection $groupMembers,
         Collection $availabilities,
         array $teamMemberByUserId,
-    ): void
+    ): array
     {
+        $activeSlotIds = [];
         $plannedWorkload = $this->initializeWorkload($groupMembers);
         $plannedLastAssignedEndAt = $this->initializeSlotMemory($groupMembers);
         $plannedContinuousMinutes = $this->initializeSlotMemory($groupMembers);
@@ -579,19 +586,22 @@ class ShiftGenerationService
         foreach ($event->tasks->sortBy([['sort_order', 'asc'], ['name', 'asc']]) as $task) {
             $desiredPeriods = is_array($task->desired_periods ?? null) ? $task->desired_periods : [];
             if (! $desiredPeriods) {
-                $this->syncEstimatedTaskSlots(
-                    event: $event,
-                    task: $task,
-                    shiftRule: $shiftRule,
-                    generationSetting: $generationSetting,
-                    groupMembers: $groupMembers,
-                    availabilities: $availabilities,
-                    teamMemberByUserId: $teamMemberByUserId,
-                    plannedWorkload: $plannedWorkload,
-                    plannedLastAssignedEndAt: $plannedLastAssignedEndAt,
-                    plannedContinuousMinutes: $plannedContinuousMinutes,
-                    plannedIntervalsByUser: $plannedIntervalsByUser,
-                );
+                $activeSlotIds = [
+                    ...$activeSlotIds,
+                    ...$this->syncEstimatedTaskSlots(
+                        event: $event,
+                        task: $task,
+                        shiftRule: $shiftRule,
+                        generationSetting: $generationSetting,
+                        groupMembers: $groupMembers,
+                        availabilities: $availabilities,
+                        teamMemberByUserId: $teamMemberByUserId,
+                        plannedWorkload: $plannedWorkload,
+                        plannedLastAssignedEndAt: $plannedLastAssignedEndAt,
+                        plannedContinuousMinutes: $plannedContinuousMinutes,
+                        plannedIntervalsByUser: $plannedIntervalsByUser,
+                    ),
+                ];
                 continue;
             }
 
@@ -652,8 +662,12 @@ class ShiftGenerationService
             $event->slots()
                 ->where('task_id', $task->id)
                 ->when($keepSlotIds, fn ($query) => $query->whereNotIn('id', $keepSlotIds))
+                ->whereDoesntHave('assignments')
                 ->delete();
+            $activeSlotIds = [...$activeSlotIds, ...$keepSlotIds];
         }
+
+        return array_values(array_unique($activeSlotIds));
     }
 
     private function syncEstimatedTaskSlots(
@@ -668,12 +682,12 @@ class ShiftGenerationService
         array &$plannedLastAssignedEndAt,
         array &$plannedContinuousMinutes,
         array &$plannedIntervalsByUser,
-    ): void
+    ): array
     {
         $desiredTotalMinutes = (int) round(((float) ($task->desired_total_hours ?? 0)) * 60);
         if ($desiredTotalMinutes <= 0) {
-            $event->slots()->where('task_id', $task->id)->delete();
-            return;
+            $event->slots()->where('task_id', $task->id)->whereDoesntHave('assignments')->delete();
+            return [];
         }
 
         $startDate = $task->work_start_date
@@ -685,8 +699,8 @@ class ShiftGenerationService
             ?? $startDate;
 
         if (! $startDate || ! $endDate) {
-            $event->slots()->where('task_id', $task->id)->delete();
-            return;
+            $event->slots()->where('task_id', $task->id)->whereDoesntHave('assignments')->delete();
+            return [];
         }
 
         $slotMinutes = max((int) $shiftRule->slot_minutes, 15);
@@ -694,14 +708,14 @@ class ShiftGenerationService
         $requiredPeople = max((int) ($task->required_people_per_slot ?? 1), 1);
         $dates = $this->datesBetween(Carbon::parse($startDate)->startOfDay(), Carbon::parse($endDate)->startOfDay());
         if (! $dates) {
-            $event->slots()->where('task_id', $task->id)->delete();
-            return;
+            $event->slots()->where('task_id', $task->id)->whereDoesntHave('assignments')->delete();
+            return [];
         }
 
         $candidateWindows = $this->activityWindowsForDates($event, $dates, $slotMinutes);
         if (! $candidateWindows) {
-            $event->slots()->where('task_id', $task->id)->delete();
-            return;
+            $event->slots()->where('task_id', $task->id)->whereDoesntHave('assignments')->delete();
+            return [];
         }
 
         $selectedWindows = $this->selectAvailabilityFirstWindows(
@@ -751,7 +765,10 @@ class ShiftGenerationService
         $event->slots()
             ->where('task_id', $task->id)
             ->whereNotIn('id', $keepSlotIds)
+            ->whereDoesntHave('assignments')
             ->delete();
+
+        return $keepSlotIds;
     }
 
     /**
