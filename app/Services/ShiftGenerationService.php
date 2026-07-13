@@ -583,7 +583,7 @@ class ShiftGenerationService
         $plannedContinuousMinutes = $this->initializeSlotMemory($groupMembers);
         $plannedIntervalsByUser = $this->initializeAssignedIntervals($groupMembers);
 
-        foreach ($event->tasks->sortBy([['sort_order', 'asc'], ['name', 'asc']]) as $task) {
+        foreach ($event->tasks->sortBy(fn ($task) => str_pad((string) ($task->sort_order ?? 0), 10, '0', STR_PAD_LEFT).'|'.Str::lower((string) $task->name))->values() as $task) {
             $desiredPeriods = is_array($task->desired_periods ?? null) ? $task->desired_periods : [];
             if (! $desiredPeriods) {
                 $activeSlotIds = [

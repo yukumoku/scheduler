@@ -8,6 +8,7 @@ use App\Http\Resources\ShiftResource;
 use App\Models\Event;
 use App\Models\Shift;
 use App\Services\ShiftGenerationService;
+use Throwable;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -43,7 +44,23 @@ class ShiftController extends Controller
     public function generate(ShiftGenerateRequest $request, Event $event): JsonResponse
     {
         $this->requireEventManager($request, $event);
-        $result = $this->shiftGenerationService->generate($event);
+        try {
+            $result = $this->shiftGenerationService->generate($event);
+        } catch (Throwable $exception) {
+            logger()->error('Shift generation failed', [
+                'event_id' => $event->id,
+                'user_id' => $request->user()?->id,
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => 'シフト作成に失敗しました。作業・参加確認・期間設定を確認してください。',
+            ], 500);
+        }
 
         return response()->json([
             'success' => true,
