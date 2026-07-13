@@ -15,6 +15,7 @@ class ShiftResource extends JsonResource
         $slots = $event && method_exists($event, 'relationLoaded') && $event->relationLoaded('slots')
             ? $event->slots
             : $assignments->map(fn ($assignment) => $assignment->eventSlot)->filter()->unique('id')->values();
+        $slots = $slots->unique('id')->values();
         $metrics = $this->buildMetrics($slots, $assignments, $event);
         $warnings = $this->buildWarnings($slots, $assignments, $event);
 

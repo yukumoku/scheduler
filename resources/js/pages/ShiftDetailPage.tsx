@@ -18,7 +18,7 @@ function groupAssignmentsBySlot(shift: Shift | null) {
   const fallbackSlots = shift.assignments
     .map((assignment) => assignment.eventSlot)
     .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot))
-  const slots = shift.slots?.length ? shift.slots : fallbackSlots
+  const slots = Array.from(new Map((shift.slots?.length ? shift.slots : fallbackSlots).map((slot) => [slot.id, slot])).values())
 
   return slots
     .map((slot) => {

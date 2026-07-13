@@ -45,10 +45,19 @@ class CommonAvailabilitySetController extends Controller
         $this->requireEventMember($request, $event);
 
         try {
-            $sets = $event->availabilitySets()
+            $sets = CommonAvailabilitySet::query()
+                ->where('group_id', $event->group_id)
+                ->where(function ($query) use ($event) {
+                    $query
+                        ->whereNull('event_id')
+                        ->orWhere('event_id', $event->id)
+                        ->when($event->common_availability_set_id, fn ($query) => $query->orWhereKey($event->common_availability_set_id));
+                })
                 ->withCount('availabilities')
                 ->latest()
                 ->get()
+                ->unique('id')
+                ->values()
                 ->map(fn (CommonAvailabilitySet $set) => $this->serializeSet($set));
         } catch (QueryException $exception) {
             report($exception);

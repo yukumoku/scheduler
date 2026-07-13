@@ -96,7 +96,9 @@ class EventController extends Controller
             'start_date' => $validated['startDate'] ?? $event->start_date,
             'end_date' => $validated['endDate'] ?? $event->end_date,
             'availability_deadline' => $validated['availabilityDeadline'] ?? $event->availability_deadline,
-            'common_availability_set_id' => $validated['commonAvailabilitySetId'] ?? null,
+            'common_availability_set_id' => array_key_exists('commonAvailabilitySetId', $validated)
+                ? ($validated['commonAvailabilitySetId'] ?? null)
+                : $event->common_availability_set_id,
             'status' => $validated['status'],
         ]);
 

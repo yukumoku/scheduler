@@ -39,7 +39,7 @@ class EventTaskController extends Controller
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'desired_total_hours' => $data['desiredTotalHours'] ?? null,
-            'required_people_per_slot' => $data['requiredPeoplePerSlot'] ?? 1,
+            'required_people_per_slot' => array_key_exists('requiredPeoplePerSlot', $data) ? $data['requiredPeoplePerSlot'] : null,
             'work_start_date' => $data['workStartDate'] ?? null,
             'work_end_date' => $data['workEndDate'] ?? null,
             'desired_periods' => $data['desiredPeriods'] ?? [],
@@ -82,8 +82,8 @@ class EventTaskController extends Controller
             ? ($data['desiredTotalHours'] ?? null)
             : $task->desired_total_hours;
         $requiredPeoplePerSlot = array_key_exists('requiredPeoplePerSlot', $data)
-            ? ($data['requiredPeoplePerSlot'] ?? 1)
-            : ($task->required_people_per_slot ?? 1);
+            ? $data['requiredPeoplePerSlot']
+            : $task->required_people_per_slot;
 
         $task->update([
             ...$this->taskAttributes([

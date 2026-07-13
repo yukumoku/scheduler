@@ -183,7 +183,7 @@ export type EventTask = {
   name: string
   description: string | null
   desiredTotalHours: number | null
-  requiredPeoplePerSlot: number
+  requiredPeoplePerSlot: number | null
   workStartDate: string | null
   workEndDate: string | null
   desiredPeriods: Array<{

@@ -16,7 +16,9 @@ class EventTaskResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'desiredTotalHours' => $this->desired_total_hours !== null ? (float) $this->desired_total_hours : null,
-            'requiredPeoplePerSlot' => max((int) ($this->required_people_per_slot ?? 1), 1),
+            'requiredPeoplePerSlot' => $this->required_people_per_slot !== null
+                ? max((int) $this->required_people_per_slot, 1)
+                : null,
             'workStartDate' => $this->work_start_date?->toDateString(),
             'workEndDate' => $this->work_end_date?->toDateString(),
             'desiredPeriods' => $this->desired_periods ?? [],

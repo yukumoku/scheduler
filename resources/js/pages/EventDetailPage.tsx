@@ -501,6 +501,8 @@ export function EventDetailPage() {
     onSuccess: async (result) => {
       setLatestGenerateResult(result)
       setShiftGenerateOpen(false)
+      await queryClient.invalidateQueries({ queryKey: ['event', eventId] })
+      await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'availability-sets'] })
       await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'shift-settings'] })
       await queryClient.invalidateQueries({ queryKey: ['event', eventId, 'shifts'] })
     },
@@ -561,8 +563,10 @@ export function EventDetailPage() {
       acc[key] = [...(acc[key] ?? []), assignment]
       return acc
     }, {})
+    const shiftSlots = (latestShift.slots?.length ? latestShift.slots : (slotsQuery.data ?? []))
+    const uniqueSlots = Array.from(new Map(shiftSlots.map((slot) => [slot.id, slot])).values())
 
-    return (slotsQuery.data ?? []).map((slot) => ({
+    return uniqueSlots.map((slot) => ({
       slot,
       assignments: grouped[slot.id] ?? [],
     }))
@@ -1234,8 +1238,17 @@ export function EventDetailPage() {
                         variant="secondary"
                         onClick={() => navigate(`/availability-sets/${currentAvailabilitySet.id}`)}
                       >
-                        入力を見る
+                        自分の入力
                       </Button>
+                      {isOwner ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => navigate(`/availability-sets/${currentAvailabilitySet.id}?tab=submissions`)}
+                        >
+                          みんなの入力
+                        </Button>
+                      ) : null}
                       {canManageGroupWorkspace ? (
                         <Button
                           type="button"
@@ -1297,9 +1310,9 @@ export function EventDetailPage() {
                               type="button"
                               variant="secondary"
                               size="sm"
-                              onClick={() => navigate(`/availability-sets/${set.id}`)}
+                              onClick={() => navigate(`/availability-sets/${set.id}${isOwner ? '?tab=submissions' : ''}`)}
                             >
-                              開く
+                              {isOwner ? '提出を見る' : '入力する'}
                             </Button>
                           </div>
                         </div>

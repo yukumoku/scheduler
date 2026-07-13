@@ -35,7 +35,10 @@ const taskSchema = z.object({
   name: z.string().min(1, '作業名を入力してください').max(255),
   description: z.string().max(2000).optional().transform((value) => value?.trim() || ''),
   desiredTotalHours: z.preprocess((value) => (value === '' || value === null ? undefined : value), z.coerce.number().positive('必要な作業時間は0より大きくしてください').optional()),
-  requiredPeoplePerSlot: z.coerce.number().int().min(1, '同時に入る人数は1人以上で入力してください').max(999, '同時人数が大きすぎます'),
+  requiredPeoplePerSlot: z.preprocess(
+    (value) => (value === '' || value === null || value === 'auto' ? null : value),
+    z.coerce.number().int().min(1, '同時に入る人数は1人以上で入力してください').max(999, '同時人数が大きすぎます').nullable(),
+  ),
   workStartDate: z.string().optional().transform((value) => value?.trim() || ''),
   workEndDate: z.string().optional().transform((value) => value?.trim() || ''),
   requiredMemberIds: z.array(z.string()).default([]),
@@ -83,7 +86,7 @@ export function TeamDetailPage() {
       name: '',
       description: '',
       desiredTotalHours: undefined,
-      requiredPeoplePerSlot: 1,
+      requiredPeoplePerSlot: null,
       workStartDate: '',
       workEndDate: '',
       requiredMemberIds: [],
@@ -171,7 +174,7 @@ export function TeamDetailPage() {
         name: editingTask.name,
         description: editingTask.description ?? '',
         desiredTotalHours: editingTask.desiredTotalHours && editingTask.desiredTotalHours > 0 ? editingTask.desiredTotalHours : undefined,
-        requiredPeoplePerSlot: editingTask.requiredPeoplePerSlot ?? 1,
+        requiredPeoplePerSlot: editingTask.requiredPeoplePerSlot,
         workStartDate: editingTask.workStartDate ?? '',
         workEndDate: editingTask.workEndDate ?? '',
         requiredMemberIds: editingTask.requiredMemberIds ?? [],
@@ -189,7 +192,7 @@ export function TeamDetailPage() {
               location: period.location ?? '',
               note: period.note ?? '',
             }))
-          : [{ date: '', startTime: '09:00', endTime: '12:00', requiredPeople: 1, location: '', note: '' }],
+          : [{ date: '', startTime: '09:00', endTime: '12:00', requiredPeople: editingTask.requiredPeoplePerSlot ?? 1, location: '', note: '' }],
       )
       const matchedPeriod = availabilitySets.find(
         (set) => set.startDate === editingTask.workStartDate && set.endDate === editingTask.workEndDate,
@@ -202,7 +205,7 @@ export function TeamDetailPage() {
       name: '',
       description: '',
       desiredTotalHours: undefined,
-      requiredPeoplePerSlot: 1,
+      requiredPeoplePerSlot: null,
       workStartDate: '',
       workEndDate: '',
       requiredMemberIds: [],
@@ -280,7 +283,7 @@ export function TeamDetailPage() {
         name: values.name,
         description: values.description || null,
         desiredTotalHours: values.desiredTotalHours ?? null,
-        requiredPeoplePerSlot: values.requiredPeoplePerSlot,
+        requiredPeoplePerSlot: values.requiredPeoplePerSlot ?? null,
         workStartDate: selectedPeriod?.startDate ?? null,
         workEndDate: selectedPeriod?.endDate ?? null,
         desiredPeriods: desiredPeriods
@@ -309,7 +312,7 @@ export function TeamDetailPage() {
         name: '',
         description: '',
         desiredTotalHours: undefined,
-        requiredPeoplePerSlot: 1,
+        requiredPeoplePerSlot: null,
         workStartDate: '',
         workEndDate: '',
         requiredMemberIds: [],
@@ -333,7 +336,7 @@ export function TeamDetailPage() {
         name: values.name,
         description: values.description || null,
         desiredTotalHours: values.desiredTotalHours ?? null,
-        requiredPeoplePerSlot: values.requiredPeoplePerSlot,
+        requiredPeoplePerSlot: values.requiredPeoplePerSlot ?? null,
         workStartDate: (selectedPeriod?.startDate ?? values.workStartDate) || null,
         workEndDate: (selectedPeriod?.endDate ?? values.workEndDate) || null,
         desiredPeriods: desiredPeriods
@@ -362,7 +365,7 @@ export function TeamDetailPage() {
         name: '',
         description: '',
         desiredTotalHours: undefined,
-        requiredPeoplePerSlot: 1,
+        requiredPeoplePerSlot: null,
         workStartDate: '',
         workEndDate: '',
         requiredMemberIds: [],
@@ -393,7 +396,7 @@ export function TeamDetailPage() {
   const selectedWorkPeriod = availabilitySets.find((set) => set.id === selectedWorkPeriodId) ?? null
   const taskRequiredMemberIds = taskForm.watch('requiredMemberIds') ?? []
   const taskDesiredTotalHours = taskForm.watch('desiredTotalHours')
-  const taskRequiredPeoplePerSlot = taskForm.watch('requiredPeoplePerSlot') || 1
+  const taskRequiredPeoplePerSlot = taskForm.watch('requiredPeoplePerSlot')
   const taskRequiredMembers = useMemo(
     () =>
       taskRequiredMemberIds
@@ -582,7 +585,7 @@ export function TeamDetailPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:justify-start">
                     {task.allowCrossTeamHelp ? <Badge variant="info">ヘルプ可</Badge> : <Badge variant="neutral">通常</Badge>}
-                    <Badge variant="neutral">1回 {task.requiredPeoplePerSlot}人</Badge>
+                    <Badge variant="neutral">{task.requiredPeoplePerSlot ? `1回 ${task.requiredPeoplePerSlot}人` : '人数は自動'}</Badge>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-sm text-slate-600">
@@ -804,7 +807,7 @@ export function TeamDetailPage() {
           name: '',
           description: '',
           desiredTotalHours: undefined,
-          requiredPeoplePerSlot: 1,
+          requiredPeoplePerSlot: null,
           workStartDate: '',
           workEndDate: '',
           requiredMemberIds: [],
@@ -942,13 +945,28 @@ export function TeamDetailPage() {
               ) : null}
             </label>
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">一度に入る人数</span>
-              <Input type="number" min={1} step={1} {...taskForm.register('requiredPeoplePerSlot')} />
-              <p className="text-xs leading-6 text-slate-500">同じ時間に何人で作業するかを決めます。作業時間の合計は人数倍しません。</p>
-              {taskForm.formState.errors.requiredPeoplePerSlot ? (
-                <p className="text-sm text-rose-600">{taskForm.formState.errors.requiredPeoplePerSlot.message}</p>
-              ) : null}
+              <span className="text-sm font-medium text-slate-700">人数</span>
+              <Select
+                value={taskRequiredPeoplePerSlot ? 'manual' : 'auto'}
+                onChange={(event) => {
+                  taskForm.setValue('requiredPeoplePerSlot', event.target.value === 'auto' ? null : 1, { shouldDirty: true, shouldValidate: true })
+                }}
+              >
+                <option value="auto">自動で割り振る</option>
+                <option value="manual">人数を指定する</option>
+              </Select>
+              <p className="text-xs leading-6 text-slate-500">通常は自動で大丈夫です。総作業時間に合わせて、行ける人へ割り振ります。</p>
             </label>
+            {taskRequiredPeoplePerSlot ? (
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-700">一度に入る人数</span>
+                <Input type="number" min={1} step={1} {...taskForm.register('requiredPeoplePerSlot')} />
+                <p className="text-xs leading-6 text-slate-500">同じ時間に必ず複数人ほしい場合だけ指定します。</p>
+                {taskForm.formState.errors.requiredPeoplePerSlot ? (
+                  <p className="text-sm text-rose-600">{taskForm.formState.errors.requiredPeoplePerSlot.message}</p>
+                ) : null}
+              </label>
+            ) : null}
           </div>
 
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
@@ -970,7 +988,7 @@ export function TeamDetailPage() {
                 onClick={() =>
                   setDesiredPeriods((current) => [
                     ...current,
-                    { date: '', startTime: '09:00', endTime: '12:00', requiredPeople: taskRequiredPeoplePerSlot, location: '', note: '' },
+                    { date: '', startTime: '09:00', endTime: '12:00', requiredPeople: taskRequiredPeoplePerSlot ?? 1, location: '', note: '' },
                   ])
                 }
               >
@@ -1106,7 +1124,7 @@ export function TeamDetailPage() {
                   name: '',
                   description: '',
                   desiredTotalHours: undefined,
-                  requiredPeoplePerSlot: 1,
+                  requiredPeoplePerSlot: null,
                   workStartDate: '',
                   workEndDate: '',
                   requiredMemberIds: [],

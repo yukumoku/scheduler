@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CalendarCheck2, Clock3, Plus, RotateCcw, Save, Trash2, Users } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Badge } from '@/components/ui/Badge'
@@ -119,8 +119,11 @@ function getMonthCells(monthKey: string): string[] {
 export function CommonAvailabilitySetPage() {
   const { setId } = useParams<{ setId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const queryClient = useQueryClient()
-  const [activeTab, setActiveTab] = useState<'input' | 'submissions'>('input')
+  const [activeTab, setActiveTab] = useState<'input' | 'submissions'>(() =>
+    searchParams.get('tab') === 'submissions' ? 'submissions' : 'input',
+  )
   const [drafts, setDrafts] = useState<Record<string, AvailabilityDraft>>({})
   const [modalDate, setModalDate] = useState<string | null>(null)
   const [modalDrafts, setModalDrafts] = useState<AvailabilityDraft[]>([])
@@ -157,10 +160,10 @@ export function CommonAvailabilitySetPage() {
   })
 
   useEffect(() => {
-    if (!canViewSubmissions && activeTab === 'submissions') {
+    if (!groupQuery.isLoading && !canViewSubmissions && activeTab === 'submissions') {
       setActiveTab('input')
     }
-  }, [activeTab, canViewSubmissions])
+  }, [activeTab, canViewSubmissions, groupQuery.isLoading])
 
   useEffect(() => {
     const nextDrafts: Record<string, AvailabilityDraft> = {}
