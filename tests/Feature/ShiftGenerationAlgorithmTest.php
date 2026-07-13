@@ -108,6 +108,51 @@ class ShiftGenerationAlgorithmTest extends TestCase
         $this->assertNotContains($busyUser->id, array_map(fn (User $user) => $user->id, $selected));
     }
 
+    public function test_cross_team_helpers_are_not_considered_when_team_members_are_enough(): void
+    {
+        $teamUser = $this->user('user-team', '班員');
+        $outsideUser = $this->user('user-outside', '他班');
+        $slot = $this->slot([
+            'team_id' => 'team-target',
+            'required_member_ids' => [],
+            'allow_cross_team_help' => true,
+        ]);
+
+        $selected = $this->selectUsersForSlot(
+            slot: $slot,
+            users: [$teamUser, $outsideUser],
+            lookup: [
+                $teamUser->id => ['teams' => ['team-target' => 'member'], 'isLeader' => false],
+                $outsideUser->id => ['teams' => ['team-other' => 'member'], 'isLeader' => false],
+            ],
+        );
+
+        $this->assertSame([$teamUser->id], array_map(fn (User $user) => $user->id, $selected));
+    }
+
+    public function test_cross_team_helpers_are_used_only_when_team_members_are_short(): void
+    {
+        $teamUser = $this->user('user-team', '班員');
+        $outsideUser = $this->user('user-outside', '他班');
+        $slot = $this->slot([
+            'team_id' => 'team-target',
+            'required_member_ids' => [],
+            'allow_cross_team_help' => true,
+            'required_people' => 2,
+        ]);
+
+        $selected = $this->selectUsersForSlot(
+            slot: $slot,
+            users: [$teamUser, $outsideUser],
+            lookup: [
+                $teamUser->id => ['teams' => ['team-target' => 'member'], 'isLeader' => false],
+                $outsideUser->id => ['teams' => ['team-other' => 'member'], 'isLeader' => false],
+            ],
+        );
+
+        $this->assertSame([$teamUser->id, $outsideUser->id], array_map(fn (User $user) => $user->id, $selected));
+    }
+
     public function test_estimated_task_slots_follow_common_availability_activity_rules(): void
     {
         $event = new Event();
@@ -320,7 +365,7 @@ class ShiftGenerationAlgorithmTest extends TestCase
         $slot->end_time = '10:00:00';
         $slot->start_datetime = Carbon::parse('2026-07-20 09:00:00');
         $slot->end_datetime = Carbon::parse('2026-07-20 10:00:00');
-        $slot->required_people = 1;
+        $slot->required_people = $taskAttributes['required_people'] ?? 1;
         $slot->setRelation('task', $task);
 
         return $slot;

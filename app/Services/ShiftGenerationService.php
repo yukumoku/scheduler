@@ -285,50 +285,39 @@ class ShiftGenerationService
         $requiredMemberIds = array_values(array_filter((array) ($slot->task?->required_member_ids ?? [])));
         $requiredCount = max((int) $slot->required_people, 0);
 
-        $candidates = [];
-        foreach ($groupMembers as $member) {
-            $user = $member->user;
-            if (! $user) {
-                continue;
-            }
+        $candidates = $this->buildCandidatesForSlot(
+            slot: $slot,
+            groupMembers: $groupMembers,
+            availabilities: $availabilities,
+            teamMemberByUserId: $teamMemberByUserId,
+            workload: $workload,
+            lastAssignedEndAt: $lastAssignedEndAt,
+            continuousMinutes: $continuousMinutes,
+            assignedIntervalsByUser: $assignedIntervalsByUser,
+            slotStart: $slotStart,
+            slotEnd: $slotEnd,
+            slotDuration: $slotDuration,
+            shiftRule: $shiftRule,
+            includeCrossTeamHelpers: false,
+        );
 
-            if ($this->hasOverlappingAssignment($assignedIntervalsByUser[$user->id] ?? [], $slotStart, $slotEnd)) {
-                continue;
-            }
-
-            $status = $this->availabilityStatusForUserAndSlot($availabilities, $slot, $user->id);
-            if ($availabilities->isNotEmpty() && ! in_array($status, [AvailabilityStatus::Available->value, AvailabilityStatus::Preferred->value], true)) {
-                continue;
-            }
-
-            $teamInfo = $teamMemberByUserId[$user->id] ?? ['teams' => [], 'isLeader' => false];
-            $taskTeamId = $slot->task?->team_id;
-            $roleInTaskTeam = $taskTeamId ? ($teamInfo['teams'][$taskTeamId] ?? null) : null;
-            $isTeamMember = $taskTeamId ? $roleInTaskTeam !== null : true;
-            if ($slot->task?->team_id && ! $slot->task->allow_cross_team_help && ! $isTeamMember) {
-                continue;
-            }
-
-            $isLeader = $taskTeamId ? $roleInTaskTeam === 'leader' : (bool) ($teamInfo['isLeader'] ?? false);
-            $hasRequiredRole = $slot->task?->required_role === 'leader' ? $isLeader : true;
-
-            $candidates[] = [
-                'user' => $user,
-                'status' => $status ?? AvailabilityStatus::Available->value,
-                'isTeamMember' => $isTeamMember,
-                'isLeader' => $isLeader,
-                'isRequiredMember' => in_array($user->id, $requiredMemberIds, true),
-                'workload' => (int) ($workload[$user->id] ?? 0),
-                'lastEndAt' => $lastAssignedEndAt[$user->id] ?? null,
-                'continuousMinutes' => (int) ($continuousMinutes[$user->id] ?? 0),
-                'hasRequiredRole' => $hasRequiredRole,
-                'violatesLimit' => $this->candidateViolatesLimit(
-                    workload: (int) ($workload[$user->id] ?? 0),
-                    continuousMinutes: (int) ($continuousMinutes[$user->id] ?? 0),
-                    lastEndAt: $lastAssignedEndAt[$user->id] ?? null,
+        if ($slot->task?->team_id && $slot->task->allow_cross_team_help && count($candidates) < $requiredCount) {
+            $candidates = [
+                ...$candidates,
+                ...$this->buildCandidatesForSlot(
+                    slot: $slot,
+                    groupMembers: $groupMembers,
+                    availabilities: $availabilities,
+                    teamMemberByUserId: $teamMemberByUserId,
+                    workload: $workload,
+                    lastAssignedEndAt: $lastAssignedEndAt,
+                    continuousMinutes: $continuousMinutes,
+                    assignedIntervalsByUser: $assignedIntervalsByUser,
                     slotStart: $slotStart,
+                    slotEnd: $slotEnd,
                     slotDuration: $slotDuration,
                     shiftRule: $shiftRule,
+                    includeCrossTeamHelpers: true,
                 ),
             ];
         }
@@ -358,6 +347,75 @@ class ShiftGenerationService
         }
 
         return $selected;
+    }
+
+    private function buildCandidatesForSlot(
+        EventSlot $slot,
+        Collection $groupMembers,
+        Collection $availabilities,
+        array $teamMemberByUserId,
+        array $workload,
+        array $lastAssignedEndAt,
+        array $continuousMinutes,
+        array $assignedIntervalsByUser,
+        Carbon $slotStart,
+        Carbon $slotEnd,
+        int $slotDuration,
+        ShiftRule $shiftRule,
+        bool $includeCrossTeamHelpers,
+    ): array {
+        $taskTeamId = $slot->task?->team_id;
+        $requiredMemberIds = array_values(array_filter((array) ($slot->task?->required_member_ids ?? [])));
+        $candidates = [];
+
+        foreach ($groupMembers as $member) {
+            $user = $member->user;
+            if (! $user) {
+                continue;
+            }
+
+            if ($this->hasOverlappingAssignment($assignedIntervalsByUser[$user->id] ?? [], $slotStart, $slotEnd)) {
+                continue;
+            }
+
+            $status = $this->availabilityStatusForUserAndSlot($availabilities, $slot, $user->id);
+            if ($availabilities->isNotEmpty() && ! in_array($status, [AvailabilityStatus::Available->value, AvailabilityStatus::Preferred->value], true)) {
+                continue;
+            }
+
+            $teamInfo = $teamMemberByUserId[$user->id] ?? ['teams' => [], 'isLeader' => false];
+            $roleInTaskTeam = $taskTeamId ? ($teamInfo['teams'][$taskTeamId] ?? null) : null;
+            $isTeamMember = $taskTeamId ? $roleInTaskTeam !== null : true;
+
+            if ($taskTeamId && $isTeamMember === $includeCrossTeamHelpers) {
+                continue;
+            }
+
+            $isLeader = $taskTeamId ? $roleInTaskTeam === 'leader' : (bool) ($teamInfo['isLeader'] ?? false);
+            $hasRequiredRole = $slot->task?->required_role === 'leader' ? $isLeader : true;
+
+            $candidates[] = [
+                'user' => $user,
+                'status' => $status ?? AvailabilityStatus::Available->value,
+                'isTeamMember' => $isTeamMember,
+                'isLeader' => $isLeader,
+                'isRequiredMember' => in_array($user->id, $requiredMemberIds, true),
+                'workload' => (int) ($workload[$user->id] ?? 0),
+                'lastEndAt' => $lastAssignedEndAt[$user->id] ?? null,
+                'continuousMinutes' => (int) ($continuousMinutes[$user->id] ?? 0),
+                'hasRequiredRole' => $hasRequiredRole,
+                'violatesLimit' => $this->candidateViolatesLimit(
+                    workload: (int) ($workload[$user->id] ?? 0),
+                    continuousMinutes: (int) ($continuousMinutes[$user->id] ?? 0),
+                    lastEndAt: $lastAssignedEndAt[$user->id] ?? null,
+                    slotStart: $slotStart,
+                    slotDuration: $slotDuration,
+                    shiftRule: $shiftRule,
+                ),
+            ];
+        }
+
+        return $candidates;
     }
 
     private function hasOverlappingAssignment(array $intervals, Carbon $slotStart, Carbon $slotEnd): bool
