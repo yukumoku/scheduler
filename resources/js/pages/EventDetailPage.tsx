@@ -187,6 +187,7 @@ export function EventDetailPage() {
   })
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [latestGenerateResult, setLatestGenerateResult] = useState<ShiftGenerateResult | null>(null)
+  const [shiftWarningsOpen, setShiftWarningsOpen] = useState(false)
   const [guideHidden, setGuideHidden] = useState(() => isEventGuideHiddenLocally())
   const [guideOpen, setGuideOpen] = useState(() => !isEventGuideHiddenLocally())
 
@@ -1718,28 +1719,38 @@ export function EventDetailPage() {
 
               {shiftWarnings.length ? (
                 <Card className="space-y-3 border-amber-200 bg-amber-50">
-                  <h3 className="text-base font-semibold text-amber-800">不足警告</h3>
-                  <div className="space-y-2">
-                    {shiftWarnings.map((warning, index) => (
-                      <div key={warning.slotId ?? `${warning.taskId ?? 'task'}-${index}`} className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
-                        {warning.date ? (
-                          <>
-                            {warning.date} {warning.startTime?.slice(0, 5)} - {warning.endTime?.slice(0, 5)}: {warning.message}
-                            <span className="ml-2 text-slate-500">
-                              {warning.assignedPeople}/{warning.requiredPeople}人
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {warning.message}
-                            {warning.missingMinutes ? (
-                              <span className="ml-2 text-slate-500">あと{Math.ceil(warning.missingMinutes / 60)}時間分</span>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-amber-800">不足警告</h3>
+                      <Badge variant="warning">{shiftWarnings.length}件</Badge>
+                    </div>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setShiftWarningsOpen((current) => !current)}>
+                      {shiftWarningsOpen ? '隠す' : '表示する'}
+                    </Button>
                   </div>
+                  {shiftWarningsOpen ? (
+                    <div className="space-y-2">
+                      {shiftWarnings.map((warning, index) => (
+                        <div key={warning.slotId ?? `${warning.taskId ?? 'task'}-${index}`} className="rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
+                          {warning.date ? (
+                            <>
+                              {warning.date} {warning.startTime?.slice(0, 5)} - {warning.endTime?.slice(0, 5)}: {warning.message}
+                              <span className="ml-2 text-slate-500">
+                                {warning.assignedPeople}/{warning.requiredPeople}人
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              {warning.message}
+                              {warning.missingMinutes ? (
+                                <span className="ml-2 text-slate-500">あと{Math.ceil(warning.missingMinutes / 60)}時間分</span>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </Card>
               ) : null}
 

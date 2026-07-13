@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -110,6 +110,7 @@ export function ShiftDetailPage() {
   const { shiftId } = useParams<{ shiftId: string }>()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const [showWarnings, setShowWarnings] = useState(false)
 
   const shiftQuery = useQuery({
     queryKey: ['shift', shiftId],
@@ -405,25 +406,33 @@ export function ShiftDetailPage() {
 
       {warnings.length ? (
         <Card className="space-y-3 border-amber-200 bg-amber-50/80">
-          <div className="flex items-center gap-2 text-amber-900">
-            <AlertTriangle className="h-5 w-5" />
-            <h2 className="text-base font-semibold">不足している枠</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-amber-900">
+              <AlertTriangle className="h-5 w-5" />
+              <h2 className="text-base font-semibold">不足している枠</h2>
+              <Badge variant="warning">{warnings.length}件</Badge>
+            </div>
+            <Button type="button" size="sm" variant="secondary" onClick={() => setShowWarnings((current) => !current)}>
+              {showWarnings ? '隠す' : '表示する'}
+            </Button>
           </div>
-          <div className="divide-y divide-amber-100 overflow-hidden rounded-2xl border border-amber-100 bg-white">
-            {warnings.map((warning) => (
-              <div key={warning.slotId} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {warning.date} {warning.startTime?.slice(0, 5)} - {warning.endTime?.slice(0, 5)}
-                  </p>
-                  <p className="text-sm text-slate-500">{warning.message}</p>
+          {showWarnings ? (
+            <div className="divide-y divide-amber-100 overflow-hidden rounded-2xl border border-amber-100 bg-white">
+              {warnings.map((warning, index) => (
+                <div key={warning.slotId ?? `${warning.taskId ?? 'task'}-${index}`} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      {warning.date ? `${warning.date} ${warning.startTime?.slice(0, 5)} - ${warning.endTime?.slice(0, 5)}` : '作業時間'}
+                    </p>
+                    <p className="text-sm text-slate-500">{warning.message}</p>
+                  </div>
+                  <Badge variant="warning">
+                    {warning.missingMinutes ? `あと${formatMinutes(warning.missingMinutes)}` : `${warning.assignedPeople}/${warning.requiredPeople}人`}
+                  </Badge>
                 </div>
-                <Badge variant="warning">
-                  {warning.assignedPeople}/{warning.requiredPeople}人
-                </Badge>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 

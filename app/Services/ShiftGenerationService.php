@@ -35,6 +35,7 @@ class ShiftGenerationService
         $workload = $this->initializeWorkload($groupMembers);
         $lastAssignedEndAt = $this->initializeSlotMemory($groupMembers);
         $continuousMinutes = $this->initializeSlotMemory($groupMembers);
+        $assignedIntervalsByUser = $this->initializeAssignedIntervals($groupMembers);
         $warnings = [];
         $assignmentRecords = [];
         $availabilityLookup = $this->buildAvailabilityLookup($slots, $availabilities);
@@ -60,6 +61,7 @@ class ShiftGenerationService
                 workload: $workload,
                 lastAssignedEndAt: $lastAssignedEndAt,
                 continuousMinutes: $continuousMinutes,
+                assignedIntervalsByUser: $assignedIntervalsByUser,
                 shiftRule: $shiftRule,
                 generationSetting: $generationSetting,
             );
@@ -102,6 +104,11 @@ class ShiftGenerationService
                 $continuousMinutes[$user->id] = $hasEnoughBreak
                     ? $slotDuration
                     : (($continuousMinutes[$user->id] ?? 0) + $slotDuration);
+                $assignedIntervalsByUser[$user->id][] = [
+                    'start' => $slotStart->copy(),
+                    'end' => $slotEnd->copy(),
+                    'slotId' => $slot->id,
+                ];
                 $assignmentRecords[] = [
                     'slotId' => $slot->id,
                     'userId' => $user->id,
@@ -226,6 +233,11 @@ class ShiftGenerationService
         return $groupMembers->mapWithKeys(fn ($member) => [$member->user_id => null])->all();
     }
 
+    private function initializeAssignedIntervals(Collection $groupMembers): array
+    {
+        return $groupMembers->mapWithKeys(fn ($member) => [$member->user_id => []])->all();
+    }
+
     private function selectUsersForSlot(
         Event $event,
         EventSlot $slot,
@@ -235,6 +247,7 @@ class ShiftGenerationService
         array &$workload,
         array &$lastAssignedEndAt,
         array &$continuousMinutes,
+        array &$assignedIntervalsByUser,
         ShiftRule $shiftRule,
         ShiftGenerationSetting $generationSetting,
     ): array {
@@ -248,6 +261,10 @@ class ShiftGenerationService
         foreach ($groupMembers as $member) {
             $user = $member->user;
             if (! $user) {
+                continue;
+            }
+
+            if ($this->hasOverlappingAssignment($assignedIntervalsByUser[$user->id] ?? [], $slotStart, $slotEnd)) {
                 continue;
             }
 
@@ -313,6 +330,24 @@ class ShiftGenerationService
         }
 
         return $selected;
+    }
+
+    private function hasOverlappingAssignment(array $intervals, Carbon $slotStart, Carbon $slotEnd): bool
+    {
+        foreach ($intervals as $interval) {
+            $start = $interval['start'] ?? null;
+            $end = $interval['end'] ?? null;
+
+            if (! $start instanceof Carbon || ! $end instanceof Carbon) {
+                continue;
+            }
+
+            if ($start->lt($slotEnd) && $end->gt($slotStart)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function compareCandidate(

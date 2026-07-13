@@ -99,6 +99,14 @@ export type CommonAvailabilitySubmissionMember = {
   availableSlots: number
   preferredSlots: number
   hasSubmitted: boolean
+  details: {
+    id: string
+    date: string | null
+    startTime: string | null
+    endTime: string | null
+    status: 'available' | 'preferred' | 'unavailable' | null
+    comment: string | null
+  }[]
 }
 
 export type CommonAvailabilitySubmissionSlot = {

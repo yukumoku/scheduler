@@ -74,6 +74,38 @@ class ShiftGenerationAlgorithmTest extends TestCase
         $this->assertSame($freshUser->id, $selected[0]->id);
     }
 
+    public function test_user_already_assigned_to_overlapping_slot_is_not_selected_again(): void
+    {
+        $busyUser = $this->user('user-busy', '同時刻の人');
+        $freeUser = $this->user('user-free', '空いている人');
+        $slot = $this->slot([
+            'team_id' => null,
+            'required_member_ids' => [],
+            'allow_cross_team_help' => true,
+        ]);
+
+        $selected = $this->selectUsersForSlot(
+            slot: $slot,
+            users: [$busyUser, $freeUser],
+            lookup: [
+                $busyUser->id => ['teams' => [], 'isLeader' => false],
+                $freeUser->id => ['teams' => [], 'isLeader' => false],
+            ],
+            assignedIntervalsByUser: [
+                $busyUser->id => [
+                    [
+                        'start' => Carbon::parse('2026-07-20 09:30:00'),
+                        'end' => Carbon::parse('2026-07-20 10:30:00'),
+                        'slotId' => 'other-slot',
+                    ],
+                ],
+            ],
+        );
+
+        $this->assertSame($freeUser->id, $selected[0]->id);
+        $this->assertNotContains($busyUser->id, array_map(fn (User $user) => $user->id, $selected));
+    }
+
     public function test_estimated_task_slots_follow_common_availability_activity_rules(): void
     {
         $event = new Event();
@@ -115,6 +147,7 @@ class ShiftGenerationAlgorithmTest extends TestCase
         array $users,
         array $lookup,
         array $workload = [],
+        array $assignedIntervalsByUser = [],
         ?ShiftRule $shiftRule = null,
     ): array {
         $groupMembers = collect(array_map(function (User $user) {
@@ -130,6 +163,10 @@ class ShiftGenerationAlgorithmTest extends TestCase
         );
         $lastAssignedEndAt = collect($users)->mapWithKeys(fn (User $user) => [$user->id => null])->all();
         $continuousMinutes = collect($users)->mapWithKeys(fn (User $user) => [$user->id => 0])->all();
+        $assignedIntervalsByUser = array_replace(
+            collect($users)->mapWithKeys(fn (User $user) => [$user->id => []])->all(),
+            $assignedIntervalsByUser,
+        );
         $method = new \ReflectionMethod(ShiftGenerationService::class, 'selectUsersForSlot');
         $method->setAccessible(true);
 
@@ -146,6 +183,7 @@ class ShiftGenerationAlgorithmTest extends TestCase
                 &$workload,
                 &$lastAssignedEndAt,
                 &$continuousMinutes,
+                &$assignedIntervalsByUser,
                 $shiftRule ?? $this->shiftRule(),
                 $this->generationSetting(),
             ],

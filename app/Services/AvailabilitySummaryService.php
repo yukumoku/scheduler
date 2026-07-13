@@ -48,7 +48,10 @@ class AvailabilitySummaryService
         $slots = $this->mergeCommonAvailabilitySlots($set, $slots, $availabilities);
 
         $memberRows = $members->map(function ($member) use ($availabilities) {
-            $memberAvailabilities = $availabilities->where('user_id', $member->user_id);
+            $memberAvailabilities = $availabilities
+                ->where('user_id', $member->user_id)
+                ->sortBy(fn (CommonAvailability $availability) => ($availability->date?->toDateString() ?? '').' '.$this->normalizeTime($availability->start_time))
+                ->values();
 
             return [
                 'id' => $member->id,
@@ -60,6 +63,14 @@ class AvailabilitySummaryService
                 'availableSlots' => $memberAvailabilities->filter(fn (CommonAvailability $availability) => in_array($this->availabilityStatusValue($availability->status), ['available', 'preferred'], true))->count(),
                 'preferredSlots' => $memberAvailabilities->filter(fn (CommonAvailability $availability) => $this->availabilityStatusValue($availability->status) === 'preferred')->count(),
                 'hasSubmitted' => $memberAvailabilities->isNotEmpty(),
+                'details' => $memberAvailabilities->map(fn (CommonAvailability $availability) => [
+                    'id' => $availability->id,
+                    'date' => $availability->date?->toDateString(),
+                    'startTime' => $this->normalizeTime($availability->start_time),
+                    'endTime' => $this->normalizeTime($availability->end_time),
+                    'status' => $this->availabilityStatusValue($availability->status),
+                    'comment' => $availability->comment,
+                ])->values(),
             ];
         })->values();
 
